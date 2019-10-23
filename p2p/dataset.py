@@ -1,11 +1,11 @@
-import numpy as np
+import torch
 from torch.utils.data import Dataset
-from Bio import SeqIO
+import numpy as np
 import pandas as pd
+from Bio import SeqIO
 
 
-
-class PeptideDataset(DataSet):
+class BiogridDataset(DataSet):
 
     def __init__(self, fasta_file, gene2acc, biogrid, num_neg=10):
         """ Read in fasta file
@@ -35,7 +35,7 @@ class PeptideDataset(DataSet):
     def random_peptide(self):
         i = np.random.randint(0, len(self.seqids))
         id_ = seld.seqids[i]
-        return self.seqdict[id_]
+        return str(self.seqdict[id_].sequence)
 
     def __getitem__(self, idx):
         """ Prepare triples for training (gene, pos, neg)"""
@@ -46,6 +46,8 @@ class PeptideDataset(DataSet):
         pos_id = row[col2]
         gene = self.g2a.loc[gene_id, 'protein_accession.version'][0]
         pos = self.g2a.loc[pos_id, 'protein_accession.version'][0]
+        gene = self.seqdict[gene].sequence
+        pos = self.seqdict[pos].sequence
         neg = self.random_peptide()
         return gene, pos, neg
 
@@ -71,3 +73,57 @@ class PeptideDataset(DataSet):
                 for _ in self.num_neg:
                     gene, pos, neg = self.__getitem__(i)
                     yield gene, pos, neg
+
+
+class StringDataset(DataSet):
+
+    def __init__(self, fasta_file, string_file, num_neg=10, score_threshold=600):
+        """ Read in fasta file
+
+        Parameters
+        ----------
+        fasta_file : filepath
+            Fasta file of sequences of interest.
+        string_file : filepath
+            Table of interactions from string.
+        """
+        fasta_seqs = SeqIO.parse(open(fasta_file, 'r'), 'fasta')
+        self.seqids = list(map(lambda x: x.id))
+        self.seqdict = dict(zip(seqids, list(fasta_seqs)))
+        self.handle = open(string_file, 'r')
+        self.string_file = string_file
+        line = self.handle.readline().lstrip()
+        cols = line.split(' ')
+        self.cols = pd.Series(np.arange(len(cols)), index=cols)
+
+    def random_peptide(self):
+        i = np.random.randint(0, len(self.seqids))
+        id_ = seld.seqids[i]
+        return str(self.seqdict[id_].sequence)
+
+    def __iter__(self):
+
+        worker_info = torch.utils.data.get_worker_info()
+        worker_id = worker_info.id
+        w = float(worker_info.num_workers)
+
+        it = 0
+        while True:
+            try:
+                line = self.handle.readline().lstrip()
+                if it % w == worker_id:
+                    toks = line.split(' ')
+                    idx = self.cols.loc['combined_score']
+                    combined_score = toks[idx]
+                    if combined_score > self.threshold:
+                        geneid = self.cols.loc['protein1']
+                        posid = self.cols.loc['protein2']
+                        neg = self.random_peptide()
+                        gene = self.seqdict[geneid].sequence
+                        pos = self.seqdict[posid].sequence
+                        yield gene, pos, neg
+
+                it += 1
+            except StopIteration:
+                self.handle = open(self.string_file, 'r')
+                line = self.handle.readline().lstrip()
