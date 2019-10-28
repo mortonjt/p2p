@@ -32,10 +32,15 @@ def p2p():
 def finetune(fasta_file, links_file,
              checkpoint_path, data_dir, model_path, logging_path,
              training_column, num_neg, batch_size, num_workers, arm_the_gpu):
+    if arm_the_gpu:
+        # pick out the first GPU
+        device_name = 'cuda:0'
+    else:
+        device_name = 'cpu'
 
     run(fasta_file, links_file,
         checkpoint_path, data_dir, model_path, logging_path,
-        training_column, num_neg, batch_size, num_workers, arm_the_gpu)
+        training_column, num_neg, batch_size, num_workers, device_name)
 
 
 if __name__ == "__main__":

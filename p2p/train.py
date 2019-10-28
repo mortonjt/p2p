@@ -1,12 +1,13 @@
-from transformers.modeling_roberta import RobertaModel
-from fairseq.modules import TransformerSentenceEncoderLayer
-from fairseq.models.roberta import RobertaModel
-from p2p.transformer import RobertaConstrastiveHead
-from tensorboardX import SummaryWriter
-from tqdm import tqdm
+import os
 import time
 import datetime
+from tqdm import tqdm
 import torch
+import torch.optim as optim
+from fairseq.models.roberta import RobertaModel
+from p2p.transformer import RobertaConstrastiveHead
+from p2p.util import parse
+from tensorboardX import SummaryWriter
 
 
 dictionary = {
@@ -50,6 +51,7 @@ def encode(x):
 
 def train(pretrained_model,
           train_dataloader, test_dataloader,
+          logging_path=None,
           emb_dimension=100, epochs=10, betas=(0.9, 0.95), clip_norm=10.,
           summary_interval=100, device=None):
     """ Train the roberta model
@@ -64,6 +66,8 @@ def train(pretrained_model,
         DataLoader for testing interactions.
     emb_dimension : int
         Number of dimensions to train the model.
+    logging_path : path
+        Path of logging file.
     epochs : int
         Number of epochs for training.
     betas : tuple of float
@@ -80,19 +84,18 @@ def train(pretrained_model,
     finetuned_model : p2p.transformer.RobertaConstrastiveHead
     """
     last_summary_time = 0
+    # the dimensionality of the roberta model
+    roberta_dim = list(list(pretrained_model.parameters())[-1].shape)[0]
     finetuned_model = RobertaConstrastiveHead(roberta_dim, emb_dimension)
-    optimizer = optim.Adamax(finetuned_model.parameters(),
-                             betas=betas)
+    optimizer = optim.Adamax(finetuned_model.parameters(), betas=betas)
 
     # Initialize logging path
     if logging_path is None:
         basename = "logdir"
         suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
-        self.logging_path = "_".join([basename, suffix])
-    else:
-        self.logging_path = logging_path
-    writer = SummaryWriter(self.logging_path)
-    ce_loss = torch.nn.CrossEntropyLoss()
+        logging_path = "_".join([basename, suffix])
+
+    writer = SummaryWriter(logging_path)
     for i in tqdm(range(epochs)):
         now = time.time()
         finetuned_model.train()
@@ -103,8 +106,9 @@ def train(pretrained_model,
             neg = pretrained_model.extract_features(neg)
 
             optimizer.zero_grad()
-            inp = inp.to(device, non_blocking=True)
-            out = out.to(device, non_blocking=True)
+            gene = gene.to(device, non_blocking=True)
+            pos = pos.to(device, non_blocking=True)
+            neg = neg.to(device, non_blocking=True)
             loss = finetuned_model.forward(gene, pos, neg)
             loss.backward()
             optimizer.step()
@@ -117,8 +121,10 @@ def train(pretrained_model,
                 gene = pretrained_model.extract_features(gene)
                 pos = pretrained_model.extract_features(pos)
                 neg = pretrained_model.extract_features(neg)
-                loss = finetuned_model.forward(gene, pos, neg)
-                cv = ce_loss(pred, out)
+                gene = gene.to(device, non_blocking=True)
+                pos = pos.to(device, non_blocking=True)
+                neg = neg.to(device, non_blocking=True)
+                cv = finetuned_model.forward(gene, pos, neg)
                 err.append(cv)
             err = torch.mean(err)
             writer.add_scalar('test_error', err, i)
@@ -130,8 +136,12 @@ def train(pretrained_model,
 def run(fasta_file, links_file,
         checkpoint_path, data_dir, model_path, logging_path,
         training_column='Training',
-        num_neg=10, batch_size=10, num_workers=10, arm_the_gpu=True):
-    """ Train interaction model.
+        emb_dimension=100, num_neg=10,
+        epochs=10, betas=(0.9, 0.95),
+        batch_size=10, num_workers=10,
+        summary_interval=1,
+        device='cpu'):
+    """ Train interaction model
 
     Parameters
     ----------
@@ -139,6 +149,8 @@ def run(fasta_file, links_file,
         Fasta file of sequences of interest.
     link_file : filepath
         Table of tab delimited interactions
+    emb_dimensions : int
+        Number of embedding dimensions.
     num_neg : int
         Number of negative samples.
     checkpoint_path : path
@@ -151,8 +163,10 @@ def run(fasta_file, links_file,
         Path for logging information.
     batch_size : int
         Number of protein triples to analyze in a given batch.
-    arm_the_gpu : bool
-        Use a gpu or not.
+    summary_interval : int
+        Number of seconds for a summary update.
+    device : str
+        Name of device to run on.
     """
     # An example of how to load your own roberta model
     # roberta_checkpoint_path = 'checkpoints/uniref50'
@@ -162,15 +176,12 @@ def run(fasta_file, links_file,
     # roberta = FairseqRobertaModel.from_pretrained(
     #     roberta_checkpoint_path, 'checkpoint_best.pt', data_dir)
 
-    # the dimensionality of the roberta model
-    roberta_dim = list(list(roberta.parameters())[-1].shape)[0]
-    classification_head = False
     pretrained_model = RobertaModel.from_pretrained(
         checkpoint_path, 'checkpoint_best.pt', data_dir)
 
     train_data, test_data, valid_data = parse(
         fasta_file, links_file, training_column,
-        batch_size, num_workers, arm_the_gpu)
+        batch_size, num_workers, device)
 
     # train the fine_tuned model parameters
     finetuned_model = train(
@@ -178,24 +189,25 @@ def run(fasta_file, links_file,
         emb_dimension, epochs, betas,
         summary_interval, device)
 
+    total, correct = 0, 0
     # evaluate accuracy on validation dataset
     for gene, pos, neg in valid_data:
         gene = pretrained_model.extract_features(gene)
         pos = pretrained_model.extract_features(pos)
-        neg = pretrained_model.extract_features(neg)
+        gene = gene.to(device, non_blocking=True)
+        pos = pos.to(device, non_blocking=True)
         pred = finetuned_model.predict(gene, pos)
         predicted = torch.round(pred)
-        total += labels.size(0)
         correct += (predicted == 1.0).sum().item()
 
     # TODO: There needs to be a list of proteins where
     # there is for sure no interaction.
 
-    l = len(valid_data)
+    total = len(valid_data)
     acc = 100 * correct / total
-    print(f'Accuracy of model on the {l} test interactions: {acc}')
+    print(f'Accuracy of model on the {total} validation interactions: {acc}')
 
     # save the model checkpoint
     suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
-    torch.save(finedtuned_model.state_dict(),
+    torch.save(finetuned_model.state_dict(),
                os.path.join(model_path, 'checkpoint_' + suffix))
