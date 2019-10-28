@@ -17,8 +17,8 @@ class TestInteractionDataset(unittest.TestCase):
 
     def test_constructor(self):
         intsd = InteractionDataset(self.seqs, self.links)
-        self.assertEqual(len(intsd.links), 99)
-        self.assertEqual(len(intsd.seqdict), 100)
+        self.assertEqual(len(intsd.links), 100)
+        self.assertEqual(len(intsd.seqdict), 101)
 
     def test_random_peptide(self):
         np.random.seed(0)
@@ -60,10 +60,17 @@ class TestInteractionDataset(unittest.TestCase):
         self.assertEqual(pos, exp_pos)
         self.assertEqual(neg, exp_neg)
 
+    def test_getitem_truncate(self):
+        np.random.seed(0)
+        intsd = InteractionDataset(self.seqs, self.links)
+        gene, pos, neg = intsd[99]
+        self.assertEqual(len(gene), 1024)
+
     def test_parse(self):
         res = parse(self.fasta_file, self.links_file,
                     training_column='Training',
                     batch_size=10, num_workers=1, arm_the_gpu=False)
+
         self.assertEqual(len(res), 3)
 
 

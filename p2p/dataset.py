@@ -72,7 +72,7 @@ class InteractionDataset(Dataset):
 
         # truncate sequences to fit
         truncseqs = list(map(clean, seqs))
-        
+
         self.seqids = list(map(lambda x: x.id, truncseqs))
         self.seqdict = dict(zip(self.seqids, truncseqs))
 
@@ -90,8 +90,6 @@ class InteractionDataset(Dataset):
         neg = self.random_peptide()
         gene = str(self.seqdict[geneid].seq)
         pos = str(self.seqdict[posid].seq)
-
-        
         return gene, pos, neg
 
     def __iter__(self):
