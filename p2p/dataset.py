@@ -75,9 +75,9 @@ class BiogridDataset(DataSet):
                     yield gene, pos, neg
 
 
-class StringDataset(DataSet):
+class InteractionDataset(DataSet):
 
-    def __init__(self, fasta_file, string_file, num_neg=10, score_threshold=600):
+    def __init__(self, fasta_file, string_file, num_neg=10):
         """ Read in fasta file
 
         Parameters
@@ -113,15 +113,12 @@ class StringDataset(DataSet):
                 line = self.handle.readline().lstrip()
                 if it % w == worker_id:
                     toks = line.split(' ')
-                    idx = self.cols.loc['combined_score']
-                    combined_score = toks[idx]
-                    if combined_score > self.threshold:
-                        geneid = self.cols.loc['protein1']
-                        posid = self.cols.loc['protein2']
-                        neg = self.random_peptide()
-                        gene = self.seqdict[geneid].sequence
-                        pos = self.seqdict[posid].sequence
-                        yield gene, pos, neg
+                    geneid = self.cols.loc['protein1']
+                    posid = self.cols.loc['protein2']
+                    neg = self.random_peptide()
+                    gene = self.seqdict[geneid].sequence
+                    pos = self.seqdict[posid].sequence
+                    yield gene, pos, neg
 
                 it += 1
             except StopIteration:
