@@ -52,7 +52,7 @@ setup(name='p2p',
       packages=find_packages(),
       scripts=glob('scripts/p2p'),
       install_requires=[
-          'biopython'
+          'biopython',
           'numpy >= 1.9.2',
           'pandas >= 0.18.0',
           'scipy >= 0.15.1',
