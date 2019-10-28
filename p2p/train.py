@@ -211,3 +211,4 @@ def run(fasta_file, links_file,
     suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
     torch.save(finetuned_model.state_dict(),
                os.path.join(model_path, 'checkpoint_' + suffix))
+    return acc
