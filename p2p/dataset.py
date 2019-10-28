@@ -19,20 +19,26 @@ class InteractionDataset(Dataset):
         """
         self.links = pd.read_table(links_file)
         seqs = list(SeqIO.parse(fasta_file, format='fasta'))
-        ids = list(map(lambda x: x.id, seqs))
-        self.seqs = dict(zip(ids, seqs))
+        self.seqids = list(map(lambda x: x.id, seqs))
+        self.seqdict = dict(zip(self.seqids, seqs))
 
     def random_peptide(self):
         i = np.random.randint(0, len(self.seqids))
-        id_ = seld.seqids[i]
-        return str(self.seqdict[id_].sequence)
+        id_ = self.seqids[i]
+        return str(self.seqdict[id_].seq)
+
+    def __getitem__(self, i):
+        geneid = self.links.iloc[i]['protein1']
+        posid = self.links.iloc[i]['protein2']
+        neg = self.random_peptide()
+        gene = str(self.seqdict[geneid].seq)
+        pos = str(self.seqdict[posid].seq)
+        return gene, pos, neg
 
     def __iter__(self):
-
         worker_info = torch.utils.data.get_worker_info()
         worker_id = worker_info.id
         w = float(worker_info.num_workers)
-
         it = 0
         while True:
             try:
@@ -45,7 +51,6 @@ class InteractionDataset(Dataset):
                     gene = self.seqdict[geneid].sequence
                     pos = self.seqdict[posid].sequence
                     yield gene, pos, neg
-
                 it += 1
             except StopIteration:
                 self.handle = open(self.string_file, 'r')
