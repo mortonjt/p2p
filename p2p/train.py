@@ -1,27 +1,48 @@
-from fairseq.models.roberta import RobertaModel as FairseqRobertaModel
+from transformers.modeling_roberta import RobertaModel
 from fairseq.modules import TransformerSentenceEncoderLayer
-
-from transformers.modeling_bert import (BertConfig, BertEncoder,
-                                        BertIntermediate, BertLayer,
-                                        BertModel, BertOutput,
-                                        BertSelfAttention,
-                                        BertSelfOutput)
-from transformers.modeling_roberta import (RobertaEmbeddings,
-                                           RobertaForMaskedLM,
-                                           RobertaForSequenceClassification,
-                                           RobertaModel)
-
+from fairseq.models.roberta import RobertaModel
 from p2p.transformer import RobertaConstrastiveHead
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 import time
 import datetime
+import torch
+
+
+dictionary = {
+    "A": 1,
+    "B": 2,
+    "C": 3,
+    "D": 4,
+    "E": 5,
+    "F": 6,
+    "G": 7,
+    "H": 8,
+    "I": 9,
+    "J": 10,
+    "K": 11,
+    "L": 12,
+    "M": 13,
+    "N": 14,
+    "O": 15,
+    "P": 16,
+    "Q": 17,
+    "R": 18,
+    "S": 19,
+    "T": 20,
+    "U": 21,
+    "V": 22,
+    "W": 23,
+    "X": 24,
+    "Y": 25,
+    "Z": 26,
+    ".": 27
+}
 
 
 def encode(x):
     """ Convert string to tokens. """
-    f = lambda i: dictionary[i]
-    tokens = list(map(f, x))
+    tokens = list(map(lambda i: dictionary[i], x))
     tokens = torch.Tensor(tokens)
     tokens = tokens.long()
     return tokens
@@ -100,18 +121,15 @@ def train(pretrained_model,
                 cv = ce_loss(pred, out)
                 err.append(cv)
             err = torch.mean(err)
-            writer.add_scalar(
-                'test_error', err, i)
-            )
-            writer.add_scalar(
-                'train_error', loss, i)
-            )
+            writer.add_scalar('test_error', err, i)
+            writer.add_scalar('train_error', loss, i)
             last_summary_time = now
     return finetuned_model
 
 
 def run(fasta_file, links_file,
         checkpoint_path, data_dir, model_path, logging_path,
+        training_column='Training',
         num_neg=10, batch_size=10, num_workers=10, arm_the_gpu=True):
     """ Train interaction model.
 
@@ -147,11 +165,11 @@ def run(fasta_file, links_file,
     # the dimensionality of the roberta model
     roberta_dim = list(list(roberta.parameters())[-1].shape)[0]
     classification_head = False
-    pretrained_model = FairseqRobertaModel.from_pretrained(
-        checkpoint_path, 'checkpoint_best.pt', data_dir])
+    pretrained_model = RobertaModel.from_pretrained(
+        checkpoint_path, 'checkpoint_best.pt', data_dir)
 
     train_data, test_data, valid_data = parse(
-        fasta_file, links_file, training_column='Training',
+        fasta_file, links_file, training_column,
         batch_size, num_workers, arm_the_gpu)
 
     # train the fine_tuned model parameters

@@ -1,8 +1,6 @@
-import argparse
-import logging
-import numpy as np
 import torch
 import torch.nn as nn
+import torch.utils as utils
 import torch.nn.functional as F
 
 
@@ -37,7 +35,7 @@ class RobertaConstrastiveHead(nn.Module):
              typically from 50 to 500.
         """
         # See here: https://adoni.github.io/2017/11/08/word2vec-pytorch/
-        super(SkipGramModel, self).__init__()
+        super(RobertaConstrastiveHead, self).__init__()
         self.emb_size = emb_size
         self.emb_dimension = emb_dimension
         # TODO: swap u and v with linear layers
