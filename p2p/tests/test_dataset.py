@@ -2,20 +2,19 @@ import unittest
 from p2p.util import get_data_path
 import pandas as pd
 from Bio import SeqIO
+from p2p.dataset import InteractionDataset
 
 
 class TestInteractionDataset(unittest.TestCase):
 
     def setUp(self):
-        links_file = get_data_path('links.txt')
-        fasta_file = get_data_path('prots.fa')
-        self.links = pd.DataFrame(links_file)
-        seqs = list(SeqIO.parse(fasta_file))
-        ids = list(map(lambda x: x.id, seqs))
-        self.seqs = dict(zip(ids, seqs))
+        self.links_file = get_data_path('links.txt')
+        self.fasta_file = get_data_path('prots.fa')
 
     def test_constructor(self):
-        pass
+        intsd = InteractionDataset(self.fasta_file, self.links_file)
+        self.assertEqual(len(intsd.links), 99)
+        self.assertEqual(len(intsd.seqs), 100)
 
 
 if __name__ == "__main__":
