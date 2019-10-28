@@ -47,6 +47,12 @@ def parse(fasta_file, links_file, training_column='Training',
                                   pin_memory=arm_the_gpu)
     return train_dataloader, test_dataloader, valid_dataloader
 
+def clean(x, threshold=1024):
+    if len(x.seq) > threshold:
+        x.seq = x.seq[:threshold]
+        return x
+    else:
+        return x
 
 class InteractionDataset(Dataset):
 
@@ -63,8 +69,12 @@ class InteractionDataset(Dataset):
             Number of negative samples.
         """
         self.links = links
-        self.seqids = list(map(lambda x: x.id, seqs))
-        self.seqdict = dict(zip(self.seqids, seqs))
+
+        # truncate sequences to fit
+        truncseqs = list(map(clean, seqs))
+        
+        self.seqids = list(map(lambda x: x.id, truncseqs))
+        self.seqdict = dict(zip(self.seqids, truncseqs))
 
     def random_peptide(self):
         i = np.random.randint(0, len(self.seqids))
@@ -80,6 +90,8 @@ class InteractionDataset(Dataset):
         neg = self.random_peptide()
         gene = str(self.seqdict[geneid].seq)
         pos = str(self.seqdict[posid].seq)
+
+        
         return gene, pos, neg
 
     def __iter__(self):

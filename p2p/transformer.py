@@ -52,6 +52,10 @@ class RobertaConstrastiveHead(nn.Module):
         # only take <s> token for pos_u, pos_v, and neg_v
         # this will obtain prot embedding
         losses = []
+        print(pos_u.shape)
+        print(pos_v.shape)
+        print(neg_v.shape)
+
         emb_u = self.u_embeddings(pos_u[:, 0, :])
         emb_v = self.v_embeddings(pos_v[:, 0, :])
         score = torch.mul(emb_u, emb_v).squeeze()

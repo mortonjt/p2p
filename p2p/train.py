@@ -1,12 +1,13 @@
 import os
 import time
 import datetime
+import numpy as np
 from tqdm import tqdm
 import torch
 import torch.optim as optim
 from fairseq.models.roberta import RobertaModel
 from p2p.transformer import RobertaConstrastiveHead
-from p2p.util import parse
+from p2p.dataset import parse
 from tensorboardX import SummaryWriter
 
 
@@ -43,16 +44,27 @@ dictionary = {
 
 def encode(x):
     """ Convert string to tokens. """
-    tokens = list(map(lambda i: dictionary[i], x))
+    tokens = list(map(lambda i: dictionary[i], list(x)))
     tokens = torch.Tensor(tokens)
     tokens = tokens.long()
     return tokens
 
+def tokenize(gene, pos, neg, model, device):
+    g = torch.cat(list(map(encode, gene)), 0)
+    p = torch.cat(list(map(encode, pos)), 0)
+    n = torch.cat(list(map(encode, neg)), 0)
+    g = model.extract_features(g)
+    p = model.extract_features(p)
+    n = model.extract_features(n)
+    g.to(device)
+    p.to(device)
+    n.to(device)
+    return g, p, n
 
 def train(pretrained_model,
           train_dataloader, test_dataloader,
           logging_path=None,
-          emb_dimension=100, epochs=10, betas=(0.9, 0.95), clip_norm=10.,
+          emb_dimension=100, epochs=10, betas=(0.9, 0.95),
           summary_interval=100, device=None):
     """ Train the roberta model
 
@@ -72,8 +84,6 @@ def train(pretrained_model,
         Number of epochs for training.
     betas : tuple of float
         Adam beta parameters.
-    clip_norm : float
-        Gradient clipping for numerical stability.
     summary_interval : int
         Number of steps before saving summary.
     device : str
@@ -100,16 +110,9 @@ def train(pretrained_model,
         now = time.time()
         finetuned_model.train()
         for gene, pos, neg in train_dataloader:
-
-            gene = pretrained_model.extract_features(gene)
-            pos = pretrained_model.extract_features(pos)
-            neg = pretrained_model.extract_features(neg)
-
             optimizer.zero_grad()
-            gene = gene.to(device, non_blocking=True)
-            pos = pos.to(device, non_blocking=True)
-            neg = neg.to(device, non_blocking=True)
-            loss = finetuned_model.forward(gene, pos, neg)
+            g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
+            loss = finetuned_model.forward(g, p, n)
             loss.backward()
             optimizer.step()
 
@@ -118,13 +121,8 @@ def train(pretrained_model,
         if now - last_summary_time > summary_interval:
             err = []
             for gene, pos, neg in test_dataloader:
-                gene = pretrained_model.extract_features(gene)
-                pos = pretrained_model.extract_features(pos)
-                neg = pretrained_model.extract_features(neg)
-                gene = gene.to(device, non_blocking=True)
-                pos = pos.to(device, non_blocking=True)
-                neg = neg.to(device, non_blocking=True)
-                cv = finetuned_model.forward(gene, pos, neg)
+                g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
+                cv = finetuned_model.forward(g, p, n)
                 err.append(cv)
             err = torch.mean(err)
             writer.add_scalar('test_error', err, i)
@@ -182,21 +180,18 @@ def run(fasta_file, links_file,
     train_data, test_data, valid_data = parse(
         fasta_file, links_file, training_column,
         batch_size, num_workers, device)
-
     # train the fine_tuned model parameters
     finetuned_model = train(
         pretrained_model, train_data, test_data,
+        logging_path, 
         emb_dimension, epochs, betas,
         summary_interval, device)
 
     total, correct = 0, 0
     # evaluate accuracy on validation dataset
     for gene, pos, neg in valid_data:
-        gene = pretrained_model.extract_features(gene)
-        pos = pretrained_model.extract_features(pos)
-        gene = gene.to(device, non_blocking=True)
-        pos = pos.to(device, non_blocking=True)
-        pred = finetuned_model.predict(gene, pos)
+        g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
+        pred = finetuned_model.predict(g, p)
         predicted = torch.round(pred)
         correct += (predicted == 1.0).sum().item()
 

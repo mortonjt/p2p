@@ -1,5 +1,6 @@
 import unittest
 from p2p.train import run, train
+from p2p.util import get_data_path
 import shutil
 
 # import numpy as np
@@ -21,15 +22,14 @@ class TestTraining(unittest.TestCase):
         self.checkpoint = '/simons/scratch/jmorton/mgt/checkpoints/uniref50'
         self.data_dir = '/simons/scratch/jmorton/mgt/data/uniref50'
 
+    # def tearDown(self):
+    #     shutil.rmtree(self.logging)
 
-    def tearDown(self):
-        shutil.rmtree(self.logging)
-
-    @unittest.skip("Run only in the presence of model or data")
+    # @unittest.skip("Run only in the presence of model or data")
     def test_run(self):
         acc1 = run(
             self.fasta_file, self.links_file,
-            self.checkpoint_path, self.data_dir,
+            self.checkpoint, self.data_dir,
             self.modelpath, self.logging,
             training_column='Training',
             emb_dimension=100, num_neg=10,
