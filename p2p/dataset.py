@@ -39,19 +39,18 @@ class InteractionDataset(Dataset):
         worker_info = torch.utils.data.get_worker_info()
         worker_id = worker_info.id
         w = float(worker_info.num_workers)
-        it = 0
-        while True:
-            try:
-                line = self.handle.readline().lstrip()
-                if it % w == worker_id:
-                    toks = line.split(' ')
-                    geneid = self.cols.loc['protein1']
-                    posid = self.cols.loc['protein2']
-                    neg = self.random_peptide()
-                    gene = self.seqdict[geneid].sequence
-                    pos = self.seqdict[posid].sequence
-                    yield gene, pos, neg
-                it += 1
-            except StopIteration:
-                self.handle = open(self.string_file, 'r')
-                line = self.handle.readline().lstrip()
+        start = 0
+        end = len(self.links)
+
+        if worker_info is None:  # single-process data loading
+            for i in range(end):
+                yield self.__getitem__[i]
+        else:
+            t = (end - start)
+            w = float(worker_info.num_workers)
+            per_worker = int(math.ceil(t / w))
+            worker_id = worker_info.id
+            iter_start = start + worker_id * per_worker
+            iter_end = min(iter_start + per_worker, end)
+            for i in range(iter_start, iter_end):
+                yield self.__getitem__[i]

@@ -58,22 +58,6 @@ class TestInteractionDataset(unittest.TestCase):
         self.assertEqual(pos, exp_pos)
         self.assertEqual(neg, exp_neg)
 
-    # def test_iter(self):
-    #     intsd = InteractionDataset(self.fasta_file, self.links_file)
-    #     seq = next(intsd)
-    #     self.assertEqual(len(seq), 203)
-    #     exp = ('MSVELWQQCVDLLRDELPSQQFNTWIRPLQVEAEGDELRVYAPNRFVLDWVNE'
-    #            'KYLGRLLELLGERGEGQLPALSLLIGSKRSRTPRAAIVPSQTHVAPPPPVAPP'
-    #            'PAPVQPVSAAPVVVPREELPPVTTAPSVSSDPYEPEEPSIDPLAAAMPAGAAP'
-    #            'AVRTERNVQVEGALKHTSYLNRTFTFENFVEGKSNQLARAAAWQVADNLKHGY'
-    #            'NPLFLYGGVGLGKTHLMHAVGNHLLKKNPNAKVVYLHSERFVADMVKALQLNA'
-    #            'INEFKRFYRSVDALLIDDIQFFARKERSQEEFFHTFNALLEGGQQVILTSDRY'
-    #            'PKEIEGLEERLKSRFGWGLTVAVEPPELETRVAILMKKAEQAKIELPHDAAFF'
-    #            'IAQRIRSNVRELEGALKRVIAHSHFMGRPITIELIRESLKDLLALQDKLVSID'
-    #            'NIQRTVAEYYKIKISDLLSKRRSRSVARPRQVAMALSKELTNHSLPEIGVAFG'
-    #            'GRDHTTVLHACRKIAQLRESDADIREDYKNLLRTLTT')
-    #     self.assertEqual(str(seq.seq), exp)
-
 
 if __name__ == "__main__":
     unittest.main()
