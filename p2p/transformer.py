@@ -7,7 +7,9 @@ import torch.nn.functional as F
 
 
 class RobertaClassificationHead(nn.Module):
-    def __init__(self, input_dim, inner_dim, num_classes, activation_fn, pooler_dropout):
+
+    def __init__(self, input_dim, inner_dim, num_classes,
+                 activation_fn, pooler_dropout):
         super().__init__()
         self.dense = nn.Linear(input_dim, inner_dim)
         self.activation_fn = utils.get_activation_fn(activation_fn)
@@ -23,9 +25,17 @@ class RobertaClassificationHead(nn.Module):
         x = self.out_proj(x)
         return x
 
+
 class RobertaConstrastiveHead(nn.Module):
     def __init__(self, emb_size, emb_dimension):
-        """Initialize model parameters. Args: emb_size: Embedding size. emb_dimention: Embedding dimention, typically from 50 to 500. """
+        """ Initialize model parameters.
+
+        Parameters
+        ----------
+        emb_size: Embedding size.
+        emb_dimention: Embedding dimention,
+             typically from 50 to 500.
+        """
         # See here: https://adoni.github.io/2017/11/08/word2vec-pytorch/
         super(SkipGramModel, self).__init__()
         self.emb_size = emb_size

@@ -57,6 +57,8 @@ setup(name='p2p',
           'pandas >= 0.18.0',
           'scipy >= 0.15.1',
           'nose >= 1.3.7',
+          'transformers',
+          'fairseq',
           'tqdm',
           'torch'
       ],
