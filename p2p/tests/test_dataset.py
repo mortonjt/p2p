@@ -17,7 +17,7 @@ class TestInteractionDataset(unittest.TestCase):
 
     def test_constructor(self):
         intsd = InteractionDataset(self.seqs, self.links)
-        self.assertEqual(len(intsd.links), 100)
+        self.assertEqual(len(intsd.links), 99)
         self.assertEqual(len(intsd.seqdict), 101)
 
     def test_random_peptide(self):

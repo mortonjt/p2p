@@ -49,13 +49,17 @@ def encode(x):
     tokens = tokens.long()
     return tokens
 
-def tokenize(gene, pos, neg, model, device):
-    g = torch.cat(list(map(encode, gene)), 0)
-    p = torch.cat(list(map(encode, pos)), 0)
-    n = torch.cat(list(map(encode, neg)), 0)
-    g = model.extract_features(g)
-    p = model.extract_features(p)
-    n = model.extract_features(n)
+def tokenize(gene, pos, neg, model, device, pad=1024):
+
+    # extract features, and take <CLS> token
+    g = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], gene))
+    p = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], pos))
+    n = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], neg))
+    
+    g = torch.cat(g, 0)
+    p = torch.cat(p, 0)
+    n = torch.cat(n, 0)
+
     g.to(device)
     p.to(device)
     n.to(device)

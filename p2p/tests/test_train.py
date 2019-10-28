@@ -34,7 +34,7 @@ class TestTraining(unittest.TestCase):
             training_column='Training',
             emb_dimension=100, num_neg=10,
             epochs=1, betas=(0.9, 0.95),
-            batch_size=10, num_workers=1,
+            batch_size=10, num_workers=0,
             summary_interval=1,
             device='cpu')
 
@@ -43,9 +43,9 @@ class TestTraining(unittest.TestCase):
             self.checkpoint_path, self.data_dir,
             self.modelpath, self.logging,
             training_column='Training',
-            emb_dimension=100, num_neg=10,
+            emb_dimension=100, num_neg=2,
             epochs=2, betas=(0.9, 0.95),
-            batch_size=10, num_workers=1,
+            batch_size=3, num_workers=0,
             summary_interval=1,
             device='cpu')
 
