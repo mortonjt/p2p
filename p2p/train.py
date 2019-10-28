@@ -15,6 +15,16 @@ from p2p.transformer import RobertaConstrastiveHead
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 import time
+import datetime
+
+
+def encode(x):
+    """ Convert string to tokens. """
+    f = lambda i: dictionary[i]
+    tokens = list(map(f, x))
+    tokens = torch.Tensor(tokens)
+    tokens = tokens.long()
+    return tokens
 
 
 def train(pretrained_model,
@@ -47,7 +57,6 @@ def train(pretrained_model,
     Returns
     -------
     finetuned_model : p2p.transformer.RobertaConstrastiveHead
-
     """
     last_summary_time = 0
     finetuned_model = RobertaConstrastiveHead(roberta_dim, emb_dimension)
@@ -66,11 +75,16 @@ def train(pretrained_model,
     for i in tqdm(range(epochs)):
         now = time.time()
         finetuned_model.train()
-        for inp, out in train_dataloader:
+        for gene, pos, neg in train_dataloader:
+
+            gene = pretrained_model.extract_features(gene)
+            pos = pretrained_model.extract_features(pos)
+            neg = pretrained_model.extract_features(neg)
+
             optimizer.zero_grad()
             inp = inp.to(device, non_blocking=True)
             out = out.to(device, non_blocking=True)
-            loss = finetuned_model.forward(inp)
+            loss = finetuned_model.forward(gene, pos, neg)
             loss.backward()
             optimizer.step()
 
@@ -78,12 +92,14 @@ def train(pretrained_model,
         now = time.time()
         if now - last_summary_time > summary_interval:
             err = []
-            for cv_in, cv_out in test_dataloader:
-                pred = finetuned_model.forward(cv_in)
-                cv = ce_loss(pred, cv_out)
+            for gene, pos, neg in test_dataloader:
+                gene = pretrained_model.extract_features(gene)
+                pos = pretrained_model.extract_features(pos)
+                neg = pretrained_model.extract_features(neg)
+                loss = finetuned_model.forward(gene, pos, neg)
+                cv = ce_loss(pred, out)
                 err.append(cv)
             err = torch.mean(err)
-
             writer.add_scalar(
                 'test_error', err, i)
             )
@@ -114,7 +130,7 @@ def run(fasta_file, links_file,
     model_path : path
         Path for finetuned model.
     logging_path : path
-        Path for logging information
+        Path for logging information.
     batch_size : int
         Number of protein triples to analyze in a given batch.
     arm_the_gpu : bool
@@ -143,3 +159,25 @@ def run(fasta_file, links_file,
         pretrained_model, train_data, test_data,
         emb_dimension, epochs, betas,
         summary_interval, device)
+
+    # evaluate accuracy on validation dataset
+    for gene, pos, neg in valid_data:
+        gene = pretrained_model.extract_features(gene)
+        pos = pretrained_model.extract_features(pos)
+        neg = pretrained_model.extract_features(neg)
+        pred = finetuned_model.predict(gene, pos)
+        predicted = torch.round(pred)
+        total += labels.size(0)
+        correct += (predicted == 1.0).sum().item()
+
+    # TODO: There needs to be a list of proteins where
+    # there is for sure no interaction.
+
+    l = len(valid_data)
+    acc = 100 * correct / total
+    print(f'Accuracy of model on the {l} test interactions: {acc}')
+
+    # save the model checkpoint
+    suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
+    torch.save(finedtuned_model.state_dict(),
+               os.path.join(model_path, 'checkpoint_' + suffix))
