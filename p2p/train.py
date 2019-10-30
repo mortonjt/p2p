@@ -123,12 +123,11 @@ def train(pretrained_model,
         # write down summary stats
         now = time.time()
         if now - last_summary_time > summary_interval:
-            err = []
+            err = 0
             for gene, pos, neg in test_dataloader:
                 g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
                 cv = finetuned_model.forward(g, p, n)
-                err.append(cv)
-            err = torch.mean(err)
+                err += cv
             writer.add_scalar('test_error', err, i)
             writer.add_scalar('train_error', loss, i)
             last_summary_time = now
@@ -201,7 +200,6 @@ def run(fasta_file, links_file,
 
     # TODO: There needs to be a list of proteins where
     # there is for sure no interaction.
-
     total = len(valid_data)
     acc = 100 * correct / total
     print(f'Accuracy of model on the {total} validation interactions: {acc}')
@@ -209,5 +207,5 @@ def run(fasta_file, links_file,
     # save the model checkpoint
     suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
     torch.save(finetuned_model.state_dict(),
-               os.path.join(model_path, 'checkpoint_' + suffix))
+               os.path.join(model_path))
     return acc

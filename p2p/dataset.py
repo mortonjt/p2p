@@ -38,12 +38,14 @@ def parse(fasta_file, links_file, training_column='Training',
     valid_dataset = InteractionDataset(seqs, valid_links)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
                                   shuffle=True, num_workers=num_workers,
-                                  pin_memory=arm_the_gpu)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
-                                 shuffle=False, num_workers=num_workers,
+                                  drop_last=True, pin_memory=arm_the_gpu)
+    test_dataloader = DataLoader(test_dataset, batch_size=2,
+                                 drop_last=True, shuffle=True, 
+                                 num_workers=num_workers,
                                  pin_memory=arm_the_gpu)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size,
-                                  shuffle=False, num_workers=num_workers,
+    valid_dataloader = DataLoader(valid_dataset, batch_size=2,
+                                  drop_last=True, shuffle=True, 
+                                  num_workers=num_workers,
                                   pin_memory=arm_the_gpu)
     return train_dataloader, test_dataloader, valid_dataloader
 
@@ -53,6 +55,7 @@ def clean(x, threshold=1024):
         return x
     else:
         return x
+
 
 class InteractionDataset(Dataset):
 
