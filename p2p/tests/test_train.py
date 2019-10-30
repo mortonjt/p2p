@@ -41,20 +41,6 @@ class TestTraining(unittest.TestCase):
             device='cpu')
         os.path.exists(self.modelpath)
 
-        acc2 = run(
-            self.fasta_file, self.links_file,
-            self.checkpoint_path, self.data_dir,
-            self.modelpath, self.logging,
-            training_column='Training',
-            emb_dimension=10, num_neg=2,
-            epochs=2, betas=(0.9, 0.95),
-            batch_size=3, num_workers=0,
-            summary_interval=1,
-            device='cpu')
-        os.path.exists(self.modelpath)
-
-        self.assertGreater(acc2, acc1)
-
 
 if __name__ == "__main__":
     unittest.main()
