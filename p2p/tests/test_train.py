@@ -22,7 +22,7 @@ class TestTraining(unittest.TestCase):
         # not ideal :(
         self.checkpoint = '/simons/scratch/jmorton/mgt/checkpoints/uniref50'
         self.data_dir = '/simons/scratch/jmorton/mgt/data/uniref50'
-n
+
     def tearDown(self):
         shutil.rmtree(self.logging, ignore_errors=True)
         os.remove(self.modelpath)

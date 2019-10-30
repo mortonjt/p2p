@@ -180,7 +180,7 @@ def run(fasta_file, links_file,
     pretrained_model = RobertaModel.from_pretrained(
         checkpoint_path, 'checkpoint_best.pt', data_dir)
 
-    train_data, test_data, valid_data = parse(
+    train_data, test_data = parse(
         fasta_file, links_file, training_column,
         batch_size, num_workers, device)
     # train the fine_tuned model parameters
@@ -189,20 +189,6 @@ def run(fasta_file, links_file,
         logging_path, 
         emb_dimension, epochs, betas,
         summary_interval, device)
-
-    total, correct = 0, 0
-    # evaluate accuracy on validation dataset
-    for gene, pos, neg in valid_data:
-        g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
-        pred = finetuned_model.predict(g, p)
-        predicted = torch.round(pred)
-        correct += (predicted == 1.0).sum().item()
-
-    # TODO: There needs to be a list of proteins where
-    # there is for sure no interaction.
-    total = len(valid_data)
-    acc = 100 * correct / total
-    print(f'Accuracy of model on the {total} validation interactions: {acc}')
 
     # save the model checkpoint
     suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")

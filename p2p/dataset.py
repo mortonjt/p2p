@@ -17,14 +17,13 @@ def parse(fasta_file, links_file, training_column='Training',
     link_file : filepath
         Table of tab delimited interactions.
     training_column : str
-        Specifies which samples are for training, testing and validation,
+        Specifies which samples are for training and testing,
         in the links file. These must be labeled as
-        'Train', 'Test' and 'Validate'.
+        'Train' and 'Test'.
     batch_size : int
         Number of protein triples to analyze in a given batch.
     num_workers : int
-        Number of workers for training (1 worker for testing and
-        another for validation).
+        Number of workers for training (1 worker for testing).
     arm_the_gpu : bool
         Use a gpu or not.
     """
@@ -32,10 +31,8 @@ def parse(fasta_file, links_file, training_column='Training',
     links = pd.read_table(links_file)
     train_links = links.loc[links['Training'] == 'Train']
     test_links = links.loc[links['Training'] == 'Test']
-    valid_links = links.loc[links['Training'] == 'Validate']
     train_dataset = InteractionDataset(seqs, train_links)
     test_dataset = InteractionDataset(seqs, test_links)
-    valid_dataset = InteractionDataset(seqs, valid_links)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
                                   shuffle=True, num_workers=num_workers,
                                   drop_last=True, pin_memory=arm_the_gpu)
@@ -43,11 +40,7 @@ def parse(fasta_file, links_file, training_column='Training',
                                  drop_last=True, shuffle=True, 
                                  num_workers=num_workers,
                                  pin_memory=arm_the_gpu)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=2,
-                                  drop_last=True, shuffle=True, 
-                                  num_workers=num_workers,
-                                  pin_memory=arm_the_gpu)
-    return train_dataloader, test_dataloader, valid_dataloader
+    return train_dataloader, test_dataloader
 
 def clean(x, threshold=1024):
     if len(x.seq) > threshold:
