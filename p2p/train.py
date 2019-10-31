@@ -69,7 +69,8 @@ def train(pretrained_model,
           train_dataloader, test_dataloader,
           logging_path=None,
           emb_dimension=100, epochs=10, betas=(0.9, 0.95),
-          summary_interval=100, device=None):
+          summary_interval=100, checkpoint_interval=100, 
+          device=None):
     """ Train the roberta model
 
     Parameters
@@ -90,6 +91,8 @@ def train(pretrained_model,
         Adam beta parameters.
     summary_interval : int
         Number of steps before saving summary.
+    checkpoint_interval : int
+        Number of steps before saving checkpoint.
     device : str
         Name of device to run (specifies gpu or not)
 
@@ -131,6 +134,12 @@ def train(pretrained_model,
             writer.add_scalar('test_error', err, i)
             writer.add_scalar('train_error', loss, i)
             last_summary_time = now
+
+        if now - last_checkpoint_time > checkpoint_interval:
+            suffix = str(i)
+            model_path_ = model_path_ + suffix
+            torch.save(finetuned_model.state_dict(), model_path_)
+            
     return finetuned_model
 
 
@@ -191,7 +200,8 @@ def run(fasta_file, links_file,
         summary_interval, device)
 
     # save the model checkpoint
+
     suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
-    torch.save(finetuned_model.state_dict(),
-               os.path.join(model_path))
+    model_path_ = model_path_ + suffix
+    torch.save(finetuned_model.state_dict(), model_path_)
     

@@ -32,7 +32,7 @@ def p2p():
               help='Number of sequences per batch for training.', default=10)
 @click.option('--num-workers',
               help='Number of workers', default=10)
-@click.option('--arm-the-gpu',
+@click.option('--arm-the-gpu', is_flag=True,
               help='Specifies whether or not to use the GPU.', default=False)
 def interactions(fasta_file, links_file,
                  checkpoint_path, data_dir, model_path, logging_path,
@@ -44,15 +44,11 @@ def interactions(fasta_file, links_file,
     else:
         device_name = 'cpu'
 
-    run(fasta_file, links_file,
-        checkpoint_path, data_dir, model_path, logging_path,
-        training_column, num_neg, batch_size, num_workers, device_name)
-
     run(fasta_file, links_file, 
         checkpoint_path, data_dir,
         model_path, logging_path,
         training_column='Training',
-        embedding_dim=embedding_dimension,
+        emb_dimension=embedding_dimension,
         num_neg=num_neg, epochs=epochs, betas=(0.9, 0.95),
         batch_size=batch_size, num_workers=num_workers,
         summary_interval=1,
