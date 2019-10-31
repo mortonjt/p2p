@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from p2p.train import run
+import click
 
 
 @click.group()
