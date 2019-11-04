@@ -1,4 +1,4 @@
-_import os
+import os
 import unittest
 from p2p.train import run, train
 from p2p.util import get_data_path

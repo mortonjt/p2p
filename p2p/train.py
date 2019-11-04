@@ -113,7 +113,7 @@ def train(pretrained_model,
         logging_path = "_".join([basename, suffix])
 
     writer = SummaryWriter(logging_path)
-    for i in tqdm(range(epochs)):
+    for i in range(epochs):
         now = time.time()
         finetuned_model.train()
         for gene, pos, neg in train_dataloader:
@@ -123,23 +123,23 @@ def train(pretrained_model,
             loss.backward()
             optimizer.step()
 
-        # write down summary stats
-        now = time.time()
-        if now - last_summary_time > summary_interval:
-            err = 0
-            for gene, pos, neg in test_dataloader:
-                g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
-                cv = finetuned_model.forward(g, p, n)
-                err += cv
-            writer.add_scalar('test_error', err, i)
-            writer.add_scalar('train_error', loss, i)
-            last_summary_time = now
-
-        if now - last_checkpoint_time > checkpoint_interval:
-            suffix = str(i)
-            model_path_ = model_path_ + suffix
-            torch.save(finetuned_model.state_dict(), model_path_)
-            
+            # write down summary stats
+            now = time.time()
+            if now - last_summary_time > summary_interval:
+                err = 0
+                for gene, pos, neg in test_dataloader:
+                    g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
+                    cv = finetuned_model.forward(g, p, n)
+                    err += cv
+                writer.add_scalar('test_error', err, i)
+                writer.add_scalar('train_error', loss, i)
+                last_summary_time = now
+    
+            if now - last_checkpoint_time > checkpoint_interval:
+                suffix = str(i)
+                model_path_ = model_path_ + suffix
+                torch.save(finetuned_model.state_dict(), model_path_)
+                
     return finetuned_model
 
 

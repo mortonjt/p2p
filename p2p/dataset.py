@@ -63,7 +63,12 @@ class InteractionDataset(Dataset):
             Table interactions.
         num_neg : int
             Number of negative samples.
-        """
+
+        Note
+        ----
+        There is a bug involving lists
+        https://github.com/pytorch/pytorch/issues/13246 
+       """
         self.links = links
 
         # truncate sequences to fit
