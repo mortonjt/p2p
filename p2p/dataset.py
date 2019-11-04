@@ -6,6 +6,28 @@ import pandas as pd
 from Bio import SeqIO
 
 
+def clean(x, threshold=1024):
+    if len(x.seq) > threshold:
+        x.seq = x.seq[:threshold]
+        return x
+    else:
+        return x
+
+
+def preprocess(seqdict, links):
+    """ Preprocesses sequences / links.
+
+    seqdict: dict of seq
+       Sequence lookup table
+    """
+    pairs = links.apply(
+        lambda x: (np.array(seqdict[x['protein1']].seq),
+                   np.array(seqdict[x['protein2']].seq)),
+        axis=1)
+    pairs = np.array(list(pairs.values))
+    return pairs
+
+
 def parse(fasta_file, links_file, training_column='Training',
           batch_size=10, num_workers=1, arm_the_gpu=False):
     """ Reads in data and creates dataloaders.
@@ -31,66 +53,54 @@ def parse(fasta_file, links_file, training_column='Training',
     links = pd.read_table(links_file)
     train_links = links.loc[links['Training'] == 'Train']
     test_links = links.loc[links['Training'] == 'Test']
-    train_dataset = InteractionDataset(seqs, train_links)
-    test_dataset = InteractionDataset(seqs, test_links)
+
+    # obtain sequences
+    truncseqs = list(map(clean, seqs))
+    seqids = list(map(lambda x: x.id, truncseqs))
+    seqdict = dict(zip(seqids, truncseqs))
+
+    # create pairs
+    train_pairs = preprocess(seqdict, train_links)
+    test_pairs = preprocess(seqdict, test_links)
+
+    train_dataset = InteractionDataset(train_pairs)
+    test_dataset = InteractionDataset(test_pairs)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
                                   shuffle=True, num_workers=num_workers,
                                   drop_last=True, pin_memory=arm_the_gpu)
     test_dataloader = DataLoader(test_dataset, batch_size=2,
-                                 drop_last=True, shuffle=True, 
+                                 drop_last=True, shuffle=True,
                                  num_workers=num_workers,
                                  pin_memory=arm_the_gpu)
     return train_dataloader, test_dataloader
 
-def clean(x, threshold=1024):
-    if len(x.seq) > threshold:
-        x.seq = x.seq[:threshold]
-        return x
-    else:
-        return x
-
 
 class InteractionDataset(Dataset):
 
-    def __init__(self, seqs, links, num_neg=10):
-        """ Read in fasta file
+    def __init__(self, pairs, num_neg=10):
+        """ Read in pairs of proteins
 
         Parameters
         ----------
-        seqs : list of Bio.Sequence
-            Sequences of interest.
-        links : pd.DataFrame
-            Table interactions.
-        num_neg : int
-            Number of negative samples.
-
-        Note
-        ----
-        There is a bug involving lists
-        https://github.com/pytorch/pytorch/issues/13246 
-       """
-        self.links = links
-
-        # truncate sequences to fit
-        truncseqs = list(map(clean, seqs))
-
-        self.seqids = list(map(lambda x: x.id, truncseqs))
-        self.seqdict = dict(zip(self.seqids, truncseqs))
+        pairs: np.array of str
+            Pairs of proteins that are experimentally validated to have
+            an interaction.
+        """
+        self.pairs = pairs
+        self.num_neg = num_neg
 
     def random_peptide(self):
-        i = np.random.randint(0, len(self.seqids))
-        id_ = self.seqids[i]
-        return str(self.seqdict[id_].seq)
+        i = np.random.randint(0, len(self.pairs))
+        j = np.round(np.random.random())
+        return self.pairs[i, j]
 
     def __len__(self):
-        return self.links.shape[0]
+        return self.pairs.shape[0]
 
     def __getitem__(self, i):
-        geneid = self.links.iloc[i]['protein1']
-        posid = self.links.iloc[i]['protein2']
+        geneid = str(self.pairs[i, 0])
+        posid = str(self.pairs[i, 1])
         neg = self.random_peptide()
-        gene = str(self.seqdict[geneid].seq)
-        pos = str(self.seqdict[posid].seq)
         return gene, pos, neg
 
     def __iter__(self):
