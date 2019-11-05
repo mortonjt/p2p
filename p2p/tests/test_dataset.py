@@ -36,7 +36,6 @@ class TestInteractionDataset(unittest.TestCase):
         seqdict = dict(zip(seqids, truncseqs))
         self.pairs = preprocess(seqdict, links)
 
-
     def test_random_peptide(self):
         np.random.seed(0)
         intsd = InteractionDataset(self.pairs)
@@ -86,7 +85,9 @@ class TestInteractionDataset(unittest.TestCase):
         res = parse(self.fasta_file, self.links_file,
                     training_column='Training',
                     batch_size=10, num_workers=1, arm_the_gpu=False)
-
+        train, test = res
+        for g, p, n in train:
+            assert True
         self.assertEqual(len(res), 2)
 
 

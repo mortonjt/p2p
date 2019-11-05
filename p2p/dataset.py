@@ -101,7 +101,7 @@ class InteractionDataset(Dataset):
         gene = self.pairs[i, 0]
         pos = self.pairs[i, 1]
         neg = self.random_peptide()
-        return gene, pos, neg
+        return ''.join(gene), ''.join(pos), ''.join(neg)
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
