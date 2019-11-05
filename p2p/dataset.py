@@ -91,15 +91,15 @@ class InteractionDataset(Dataset):
 
     def random_peptide(self):
         i = np.random.randint(0, len(self.pairs))
-        j = np.round(np.random.random())
+        j = int(np.round(np.random.random()))
         return self.pairs[i, j]
 
     def __len__(self):
         return self.pairs.shape[0]
 
     def __getitem__(self, i):
-        geneid = str(self.pairs[i, 0])
-        posid = str(self.pairs[i, 1])
+        gene = self.pairs[i, 0]
+        pos = self.pairs[i, 1]
         neg = self.random_peptide()
         return gene, pos, neg
 

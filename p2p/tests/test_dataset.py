@@ -41,21 +41,20 @@ class TestInteractionDataset(unittest.TestCase):
         np.random.seed(0)
         intsd = InteractionDataset(self.pairs)
         seq = intsd.random_peptide()
-        print(len(seq))
-        self.assertEqual(len(seq), 234)
+        self.assertEqual(len(seq), 200)
 
     def test_getitem(self):
         np.random.seed(0)
         intsd = InteractionDataset(self.pairs)
         gene, pos, neg = intsd[0]
 
-        exp_gene = (
+        exp_gene = list(
             'MINEIKKEAQERMGKTLEALGHAFAKIRTGRAHPSILDSVMVSYYGADTPLRQVANVTV'
             'EDSRTLALAVFDKSMIQAVEKAIMTSDLGLNPATAGTTIRVPMPALTEETRKGYTKQAR'
             'AEAEQARVSVRNIRRDALAQLKDLQKEKEISEDEERRAGDDVQKLTDKFIGEIEKALEA'
             'KEADLMAV'
         )
-        exp_pos = (
+        exp_pos = list(
             'MMRSHYCGQLNESLDGQEVTLCGWVHRRRDHGGVIFLDVRDREGLAQVVFDPDRAETFA'
             'KADRVRSEFVVKITGKVRLRPEGARNPNMASGSIEVLGYELEVLNQAETPPFPLDEYSD'
             'VGEETRLRYRFIDLRRPEMAAKLKLRARITSSIRRYLDDNGFLDVETPILGRPTPEGAR'
@@ -67,21 +66,20 @@ class TestInteractionDataset(unittest.TestCase):
             'RAYDMVLNGTELGGGSIRIHDKSMQQAVFRVLGIDEAEQEEKFGFLLDALKYGAPPHGG'
             'LAFGLDRLVMLMTGASSIREVIAFPKTQSAGDVMTQAPGSVDGKALRELHIRLREQPKAE'
         )
-        exp_neg = (
-            'MTTSDLPAFWTVIPAAGVGSRMRADRPKQYLDLAGRTVIERTLDCFLEHPMLRGLVVCLA'
-            'EDDPYWPGLDCAASRHVQRAAGGVERADSVLSGLLRLLELGAQADDWVLVHDAARPNLTR'
-            'GDLDRLLEELAEDPVGGLLAVPARDTLKRSDRDGRVSETIDRSVVWLAYTPQMFRLGALH'
-            'RALADALVAGVAITDEASAMEWAGYAPKLVEGRADNLKITTPEDLLRLQRSFPH'
+        exp_neg = list(
+            'MDLFADAPLTLPDADLRYLPHWLDAPLASAWLLRLEQETPWEQPILRIHGEEHPTPRLV'
+            'AWYGDPDAAYRYSGQVHRPLPWTALLGEIRERVEREVGQRVNGVLLNYYRDGQDSMGWH'
+            'SDDEPELRRDPLVASLSLGGSRRFDLRRKGQTRIAHSLELTHGSLLVMRGATQHHWQHQ'
+            'VAKTRRSCMPRLNLTFRLVYPQP'
         )
-
-        self.assertEqual(gene, exp_gene)
-        self.assertEqual(pos, exp_pos)
-        self.assertEqual(neg, exp_neg)
+        self.assertListEqual(list(gene), exp_gene)
+        self.assertListEqual(list(pos), exp_pos)
+        self.assertListEqual(list(neg), exp_neg)
 
     def test_getitem_truncate(self):
         np.random.seed(0)
         intsd = InteractionDataset(self.pairs)
-        gene, pos, neg = intsd[99]
+        gene, pos, neg = intsd[98]
         self.assertEqual(len(gene), 1024)
 
     def test_parse(self):
@@ -89,7 +87,7 @@ class TestInteractionDataset(unittest.TestCase):
                     training_column='Training',
                     batch_size=10, num_workers=1, arm_the_gpu=False)
 
-        self.assertEqual(len(res), 3)
+        self.assertEqual(len(res), 2)
 
 
 if __name__ == "__main__":
