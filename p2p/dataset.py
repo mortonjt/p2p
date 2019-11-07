@@ -1,6 +1,7 @@
 import torch
+import glob
 import math
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, RandomSampler
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
@@ -66,13 +67,34 @@ def parse(fasta_file, links_file, training_column='Training',
     train_dataset = InteractionDataset(train_pairs)
     test_dataset = InteractionDataset(test_pairs)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
-                                  shuffle=True, num_workers=num_workers,
+                                  shuffle=False, num_workers=num_workers,
+                                  sampler=RandomSampler(train_dataset),
                                   drop_last=True, pin_memory=arm_the_gpu)
-    test_dataloader = DataLoader(test_dataset, batch_size=2,
-                                 drop_last=True, shuffle=True,
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
+                                 drop_last=True, shuffle=False,
+                                 sampler=RandomSampler(test_dataset),
                                  num_workers=num_workers,
                                  pin_memory=arm_the_gpu)
     return train_dataloader, test_dataloader
+
+
+class InteractionDataDirectory(Dataset):
+
+    def __init__(self, fasta_file, links_directory,
+                 training_column='Training',
+                 batch_size=10, num_workers=1, arm_the_gpu=False):
+        self.fasta_file = fasta_file
+        self.filenames = (x for x in glob.glob(f'{links_directory}/*'))
+        self.training_column = training_column
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.arm_the_gpu = arm_the_gpu
+
+    def __iter__(self):
+        fname = next(self.filenames)
+        train, test = parse(self.fasta_file, fname, self.training_column, 
+                            self.batch_size, self.num_workers, self.arm_the_gpu)
+        yield train, test
 
 
 class InteractionDataset(Dataset):
