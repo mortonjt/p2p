@@ -114,13 +114,13 @@ def train(pretrained_model, directory_dataloader,
     it = 0
     writer = SummaryWriter(logging_path)
     now = time.time()
-
+    print('Number datasets', len(directory_dataloader))
     for k, dataloader in enumerate(directory_dataloader):
         train_dataloader, test_dataloader = dataloader
         num_batches = len(train_dataloader)
         num_cv_batches = len(test_dataloader)
     
-        print(f'dataset {k}, time {now}')
+        print(f'dataset {k}, num_batches {num_batches}, num_cvs {num_cv_batches}, time {now}')
         finetuned_model.train()
         for j, (gene, pos, neg) in enumerate(train_dataloader):
             now = time.time()
@@ -161,7 +161,7 @@ def train(pretrained_model, directory_dataloader,
                 torch.cuda.empty_cache()
         
             if (now - last_checkpoint_time) > checkpoint_interval:
-                suffix = str(i)
+                suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
                 model_path_ = model_path + suffix
                 torch.save(finetuned_model.state_dict(), model_path_)
     return finetuned_model

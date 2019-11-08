@@ -21,15 +21,17 @@ def preprocess(seqdict, links):
     seqdict: dict of seq
        Sequence lookup table
     """
+    # 0 = protein 1
+    # 1 = protein 2
     pairs = links.apply(
-        lambda x: (np.array(seqdict[x['protein1']].seq),
-                   np.array(seqdict[x['protein2']].seq)),
+        lambda x: (np.array(seqdict[x[1]].seq),
+                   np.array(seqdict[x[2]].seq)),
         axis=1)
     pairs = np.array(list(pairs.values))
     return pairs
 
 
-def parse(fasta_file, links_file, training_column='Training',
+def parse(fasta_file, links_file, training_column=2,
           batch_size=10, num_workers=1, arm_the_gpu=False):
     """ Reads in data and creates dataloaders.
 
@@ -51,28 +53,26 @@ def parse(fasta_file, links_file, training_column='Training',
         Use a gpu or not.
     """
     seqs = list(SeqIO.parse(fasta_file, format='fasta'))
-    links = pd.read_table(links_file)
-    train_links = links.loc[links['Training'] == 'Train']
-    test_links = links.loc[links['Training'] == 'Test']
+    links = pd.read_table(links_file, header=None, index_col=0)
+    train_links = links.loc[links[3] == 'Train']
+    test_links = links.loc[links[3] == 'Test']
 
     # obtain sequences
     truncseqs = list(map(clean, seqs))
     seqids = list(map(lambda x: x.id, truncseqs))
     seqdict = dict(zip(seqids, truncseqs))
-
+    print(links.shape)
     # create pairs
     train_pairs = preprocess(seqdict, train_links)
     test_pairs = preprocess(seqdict, test_links)
-
+    print(train_pairs.shape, test_pairs.shape)
     train_dataset = InteractionDataset(train_pairs)
     test_dataset = InteractionDataset(test_pairs)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
                                   shuffle=False, num_workers=num_workers,
-                                  sampler=RandomSampler(train_dataset),
                                   drop_last=True, pin_memory=arm_the_gpu)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
                                  drop_last=True, shuffle=False,
-                                 sampler=RandomSampler(test_dataset),
                                  num_workers=num_workers,
                                  pin_memory=arm_the_gpu)
     return train_dataloader, test_dataloader
@@ -81,21 +81,27 @@ def parse(fasta_file, links_file, training_column='Training',
 class InteractionDataDirectory(Dataset):
 
     def __init__(self, fasta_file, links_directory,
-                 training_column='Training',
+                 training_column=2,
                  batch_size=10, num_workers=1, arm_the_gpu=False):
+        print('links_directory', links_directory)
         self.fasta_file = fasta_file
-        self.filenames = (x for x in glob.glob(f'{links_directory}/*'))
+        self.filenames = glob.glob(f'{links_directory}/*')
         self.training_column = training_column
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.arm_the_gpu = arm_the_gpu
+        self.index = 0
+
+    def __len__(self):
+        return len(self.filenames)
 
     def __iter__(self):
-        fname = next(self.filenames)
-        train, test = parse(self.fasta_file, fname, self.training_column, 
-                            self.batch_size, self.num_workers, self.arm_the_gpu)
-        yield train, test
-
+        return (
+            parse(self.fasta_file, fname, self.training_column,
+                  self.batch_size, self.num_workers, self.arm_the_gpu)
+            for fname in self.filenames
+        )
+ 
 
 class InteractionDataset(Dataset):
 

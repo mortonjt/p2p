@@ -10,8 +10,8 @@ def p2p():
 @p2p.command()
 @click.option('--fasta-file',
               help='Input sequences in fasta format.')
-@click.option('--links-file',
-              help='Input tab-delimited file of interactions.')
+@click.option('--links-directory',
+              help='Directory of tab-delimited files of interactions.')
 @click.option('--checkpoint-path',
               help='Checkpoint path.')
 @click.option('--data-dir',
@@ -38,7 +38,7 @@ def p2p():
               help='Checkpoint interval in seconds', default=7200)
 @click.option('--arm-the-gpu', is_flag=True,
               help='Specifies whether or not to use the GPU.', default=False)
-def interactions(fasta_file, links_file,
+def interactions(fasta_file, links_directory,
                  checkpoint_path, data_dir, model_path, logging_path,
                  training_column, embedding_dimension, num_neg, epochs,
                  batch_size, num_workers, summary_interval, checkpoint_interval, 
@@ -47,12 +47,12 @@ def interactions(fasta_file, links_file,
         # pick out the first GPU
         device_name = 'cuda:0'
     else:
-        device_name = 'cpu'
-
-    run(fasta_file, links_file, 
+            device_name = 'cpu'
+    print('links_directory', links_directory)
+    run(fasta_file, links_directory, 
         checkpoint_path, data_dir,
         model_path, logging_path,
-        training_column='Training',
+        training_column=training_column,
         emb_dimension=embedding_dimension,
         num_neg=num_neg, epochs=epochs, betas=(0.9, 0.95),
         batch_size=batch_size, num_workers=num_workers,

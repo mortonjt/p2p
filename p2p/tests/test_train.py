@@ -35,7 +35,7 @@ class TestTraining(unittest.TestCase):
             self.fasta_file, self.links_file,
             self.checkpoint, self.data_dir,
             self.modelpath, self.logging,
-            training_column='Training',
+            training_column=2,
             emb_dimension=100, num_neg=2,
             epochs=1, betas=(0.9, 0.95),
             batch_size=4, num_workers=4,
