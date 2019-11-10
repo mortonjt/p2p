@@ -58,6 +58,8 @@ setup(name='p2p',
           'scipy >= 0.15.1',
           'nose >= 1.3.7',
           'fairseq',
+          'transformers',
+          'apex',
           'tqdm',
           'torch'
       ],
