@@ -61,11 +61,9 @@ def parse(fasta_file, links_file, training_column=2,
     truncseqs = list(map(clean, seqs))
     seqids = list(map(lambda x: x.id, truncseqs))
     seqdict = dict(zip(seqids, truncseqs))
-    print(links.shape)
     # create pairs
     train_pairs = preprocess(seqdict, train_links)
     test_pairs = preprocess(seqdict, test_links)
-    print(train_pairs.shape, test_pairs.shape)
     train_dataset = InteractionDataset(train_pairs)
     test_dataset = InteractionDataset(test_pairs)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
@@ -95,6 +93,14 @@ class InteractionDataDirectory(Dataset):
     def __len__(self):
         return len(self.filenames)
 
+    def total(self):
+        t = 0
+        for fname in self.filenames:
+            res = parse(self.fasta_file, fname, self.training_column,
+                        self.batch_size, self.num_workers, self.arm_the_gpu)
+            t += len(res[0])
+        return t            
+        
     def __iter__(self):
         return (
             parse(self.fasta_file, fname, self.training_column,

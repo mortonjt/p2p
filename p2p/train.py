@@ -9,6 +9,7 @@ from fairseq.models.roberta import RobertaModel
 from p2p.transformer import RobertaConstrastiveHead
 from p2p.dataset import InteractionDataDirectory
 from tensorboardX import SummaryWriter
+from transformers import AdamW, WarmupLinearSchedule
 
 
 dictionary = {
@@ -69,7 +70,9 @@ def tokenize(gene, pos, neg, model, device, pad=1024):
 # @profile
 def train(pretrained_model, directory_dataloader,
           logging_path=None,
-          emb_dimension=100, epochs=10, betas=(0.9, 0.95),
+          emb_dimension=100, epochs=10, 
+          learning_rate=5e-5, 
+          warmup_steps=1000,
           summary_interval=100, checkpoint_interval=100, 
           model_path='model', device=None):
     """ Train the roberta model
@@ -104,7 +107,10 @@ def train(pretrained_model, directory_dataloader,
     # the dimensionality of the roberta model
     roberta_dim = list(list(pretrained_model.parameters())[-1].shape)[0]
     finetuned_model = RobertaConstrastiveHead(roberta_dim, emb_dimension)
-    optimizer = optim.Adamax(finetuned_model.parameters(), betas=betas)
+    # optimizer = optim.Adamax(finetuned_model.parameters(), betas=betas)
+    optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
+    scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, 
+                                     t_total=directory_dataloader.total())
 
     # Initialize logging path
     if logging_path is None:
@@ -124,38 +130,25 @@ def train(pretrained_model, directory_dataloader,
         finetuned_model.train()
         for j, (gene, pos, neg) in enumerate(train_dataloader):
             now = time.time()
-            optimizer.zero_grad()            
+            
             g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
             loss = finetuned_model.forward(g, p, n)
             loss.backward()
             optimizer.step()
+            scheduler.step() 
+            finetuned_model.zero_grad()            
+
             # clean up
             it += len(gene)
             err = loss.item()
             print(f'dataset {k}, batch {j}, err {err}, total batches {num_batches}, time {now}')
         
-            # write down summary stats (uncomment after debugging)
-            # now = time.time()
-            # if (now - last_summary_time) > summary_interval:
-            #     cv_err = 0
-            #     for j, (cv_gene, cv_pos, cv_neg) in enumerate(test_dataloader):
-            #         gv, pv, nv = tokenize(cv_gene, cv_pos, cv_neg, 
-            #                               pretrained_model, device)
-            #         cv = finetuned_model.forward(gv, pv, nv)
-            #         cv_err += cv.item()
-            #         print(f'epoch {i}, batch {j}, cv_err {cv_err}, total batches {num_cv_batches}, time {now}')
-            # 
-            #         #clean up
-            #         del cv
-            #         if 'cuda' in device:
-            #             torch.cuda.empty_cache()
-            # 
-            #         # cap the number of cross validations
-            #         if j > 100: continue
-            #             
-            #     writer.add_scalar('test_error', cv_err, it)
-            #     writer.add_scalar('train_error', err, it)
-            #     last_summary_time = now
+            # write down summary stats
+            now = time.time()
+            if (now - last_summary_time) > summary_interval:
+                writer.add_scalar('train_error', err, it)
+                last_summary_time = now
+                             
             del loss
             if 'cuda' in device:
                 torch.cuda.empty_cache()
@@ -164,6 +157,25 @@ def train(pretrained_model, directory_dataloader,
                 suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
                 model_path_ = model_path + suffix
                 torch.save(finetuned_model.state_dict(), model_path_)
+        
+        cv_err = 0
+        for j, (cv_gene, cv_pos, cv_neg) in enumerate(test_dataloader):
+            gv, pv, nv = tokenize(cv_gene, cv_pos, cv_neg, 
+                                  pretrained_model, device)
+            cv = finetuned_model.forward(gv, pv, nv)
+            cv_err += cv.item()
+            print(f'epoch {i}, batch {j}, cv_err {cv_err}, total batches {num_cv_batches}, time {now}')
+             
+            #clean up
+            del cv
+            if 'cuda' in device:
+                torch.cuda.empty_cache()
+             
+            # cap the number of cross validations
+            # if j > 100: continue                         
+        writer.add_scalar('test_error', cv_err, it)
+
+
     return finetuned_model
 
 
@@ -171,7 +183,8 @@ def run(fasta_file, links_directory,
         checkpoint_path, data_dir, model_path, logging_path,
         training_column='Training',
         emb_dimension=100, num_neg=10,
-        epochs=10, betas=(0.9, 0.95),
+        epochs=10, learning_rate=5e-5, 
+        warmup_steps=1000,
         batch_size=10, num_workers=10,
         summary_interval=1, checkpoint_interval=1000,
         device='cpu'):
@@ -223,7 +236,8 @@ def run(fasta_file, links_directory,
     finetuned_model = train(
         pretrained_model, interaction_directory,
         logging_path, 
-        emb_dimension, epochs, betas,
+        emb_dimension, epochs, 
+        learning_rate, warmup_steps,
         summary_interval, checkpoint_interval, 
         model_path, device)
 
