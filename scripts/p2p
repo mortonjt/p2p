@@ -31,11 +31,15 @@ def p2p():
 @click.option('--learning-rate',
               help='Learning rate.', default=5e-5)
 @click.option('--warmup-steps',
-              help='Warmup steps.', default=0)
+              help='Warmup steps for scheduler.', default=0)
+@click.option('--gradient-accumulation-steps',
+              help=('Number of steps before gradients are computed. '
+                   'This allows for a larger effective batch size.'), 
+              default=0)
 @click.option('--fp16',
               help='16 bit precision.', default=False)
 @click.option('--batch-size',
-              help='Number of sequences per batch for training.', default=10)
+              help='Number of sequences per batch for training per GPU.', default=10)
 @click.option('--num-workers',
               help='Number of workers', default=10)
 @click.option('--summary-interval',
@@ -47,7 +51,7 @@ def p2p():
 def interactions(fasta_file, links_directory,
                  checkpoint_path, data_dir, model_path, logging_path,
                  training_column, embedding_dimension, num_neg, epochs,
-                 learning_rate, warmup_steps, fp16,
+                 learning_rate, warmup_steps, gradient_accumulation_steps, fp16,
                  batch_size, num_workers, summary_interval, checkpoint_interval, 
                  arm_the_gpu):
     if arm_the_gpu:
@@ -63,7 +67,8 @@ def interactions(fasta_file, links_directory,
         emb_dimension=embedding_dimension,
         num_neg=num_neg, epochs=epochs, 
         learning_rate=learning_rate, 
-        warmup_steps=warmup_steps,
+        warmup_steps=warmup_steps, 
+        gradient_accumulation_steps=gradient_accumulation_steps,
         batch_size=batch_size, num_workers=num_workers,
         summary_interval=summary_interval, 
 	checkpoint_interval=checkpoint_interval,

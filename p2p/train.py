@@ -97,7 +97,8 @@ def train(pretrained_model, directory_dataloader,
     fp16 : bool
         Specifies whether or not to use 16 bit precision.
         Note that apex is required for this. 
-        TODO: there is a bug in this option.
+        TODO: there is a bug in this option that will return
+        AttributeError: 'NoneType' object has no attribute 'next_functions'
     n_gpu : int
         Number of gpus
     summary_interval : int
@@ -126,6 +127,7 @@ def train(pretrained_model, directory_dataloader,
     optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, 
                                      t_total=t_total)
+    finetuned_model.to(device)
     if fp16:
         try:
             from apex import amp
@@ -137,8 +139,7 @@ def train(pretrained_model, directory_dataloader,
     print("Utilizing ", torch.cuda.device_count(), device)
     if n_gpu > 1:
         finetuned_model = torch.nn.DataParallel(finetuned_model)
-    finetuned_model.to(device)
-
+    
 
     # Initialize logging path
     if logging_path is None:
@@ -163,7 +164,6 @@ def train(pretrained_model, directory_dataloader,
             
             g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
             loss = finetuned_model.forward(g, p, n)
-
 
             if n_gpu > 1:
                 loss = loss.mean()
@@ -200,7 +200,11 @@ def train(pretrained_model, directory_dataloader,
                 suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
                 model_path_ = model_path + suffix
                 # for parallel training
-                torch.save(finetuned_model.state_dict(), model_path_)
+                try:
+                    state_dict = finetuned_model.module.state_dict()
+                except AttributeError:
+                    state_dict = finetuned_model.state_dict()
+                torch.save(state_dict, model_path_)
  
         # cross validation after each dataset is processed
         cv_err = 0
@@ -275,7 +279,9 @@ def run(fasta_file, links_directory,
 
     pretrained_model = RobertaModel.from_pretrained(
         checkpoint_path, 'checkpoint_best.pt', data_dir)
-    
+
+    n_gpu = torch.cuda.device_count()
+    batch_size = batch_size * n_gpu
     interaction_directory = InteractionDataDirectory(
         fasta_file, links_directory, training_column,
         batch_size, num_workers, device
