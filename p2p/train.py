@@ -62,10 +62,10 @@ def tokenize(gene, pos, neg, model, device, pad=1024):
         p = torch.cat(p, 0)
         n = torch.cat(n, 0)
 
-    g.to(device)
-    p.to(device)
-    n.to(device)
-    return g, p, n
+    g_ = g.to(device, non_blocking=True)
+    p_ = p.to(device, non_blocking=True)
+    n_ = n.to(device, non_blocking=True)
+    return g_, p_, n_
 
 # @profile
 def train(pretrained_model, directory_dataloader,
@@ -73,7 +73,8 @@ def train(pretrained_model, directory_dataloader,
           emb_dimension=100, epochs=10, 
           learning_rate=5e-5, 
           warmup_steps=1000,
-          summary_interval=100, checkpoint_interval=100, 
+          gradient_accumulation_steps=1,          
+          fp16=False, summary_interval=100, checkpoint_interval=100,         
           model_path='model', device=None):
     """ Train the roberta model
 
@@ -89,8 +90,16 @@ def train(pretrained_model, directory_dataloader,
         Path of logging file.
     epochs : int
         Number of epochs for training.
-    betas : tuple of float
-        Adam beta parameters.
+    learning_rate : float
+        Learning rate of ADAM
+    warmup_steps : int
+        Number of warmup steps for scheduler
+    fp16 : bool
+        Specifies whether or not to use 16 bit precision.
+        Note that apex is required for this. 
+        TODO: there is a bug in this option.
+    n_gpu : int
+        Number of gpus
     summary_interval : int
         Number of steps before saving summary.
     checkpoint_interval : int
@@ -101,6 +110,10 @@ def train(pretrained_model, directory_dataloader,
     Returns
     -------
     finetuned_model : p2p.transformer.RobertaConstrastiveHead
+
+    Notes
+    -----
+    This is only designed to run 1 epoch at the moment.
     """
     last_summary_time = time.time()
     last_checkpoint_time = time.time()
@@ -108,9 +121,24 @@ def train(pretrained_model, directory_dataloader,
     roberta_dim = list(list(pretrained_model.parameters())[-1].shape)[0]
     finetuned_model = RobertaConstrastiveHead(roberta_dim, emb_dimension)
     # optimizer = optim.Adamax(finetuned_model.parameters(), betas=betas)
+    t_total = directory_dataloader.total()
+    t_total = t_total // gradient_accumulation_steps
     optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, 
-                                     t_total=directory_dataloader.total())
+                                     t_total=t_total)
+    if fp16:
+        try:
+            from apex import amp
+        except ImportError:
+            raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
+        finetuned_model, optimizer = amp.initialize(finetuned_model, optimizer, opt_level='O1')
+    n_gpu = torch.cuda.device_count()
+    print(os.environ["CUDA_VISIBLE_DEVICES"], 'devices available')
+    print("Utilizing ", torch.cuda.device_count(), device)
+    if n_gpu > 1:
+        finetuned_model = torch.nn.DataParallel(finetuned_model)
+    finetuned_model.to(device)
+
 
     # Initialize logging path
     if logging_path is None:
@@ -120,31 +148,46 @@ def train(pretrained_model, directory_dataloader,
     it = 0
     writer = SummaryWriter(logging_path)
     now = time.time()
+    last_now = time.time()
     print('Number datasets', len(directory_dataloader))
     for k, dataloader in enumerate(directory_dataloader):
         train_dataloader, test_dataloader = dataloader
         num_batches = len(train_dataloader)
         num_cv_batches = len(test_dataloader)
     
-        print(f'dataset {k}, num_batches {num_batches}, num_cvs {num_cv_batches}, time {now}')
+        print(f'dataset {k}, num_batches {num_batches}, num_cvs {num_cv_batches}, seconds / batch {now - last_now}')
         finetuned_model.train()
         for j, (gene, pos, neg) in enumerate(train_dataloader):
+            last_now = now
             now = time.time()
             
             g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
             loss = finetuned_model.forward(g, p, n)
-            loss.backward()
-            optimizer.step()
-            scheduler.step() 
-            finetuned_model.zero_grad()            
+
+
+            if n_gpu > 1:
+                loss = loss.mean()
+            if gradient_accumulation_steps > 1:
+                loss = loss / gradient_accumulation_steps
+            if fp16:
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                loss.backward()
+
+            # accumulate gradients - so that we do backprop after loss
+            # has been calculated on entire batch
+            if j % gradient_accumulation_steps == 0:
+                optimizer.step()
+                scheduler.step() 
+                finetuned_model.zero_grad()            
 
             # clean up
             it += len(gene)
             err = loss.item()
-            print(f'dataset {k}, batch {j}, err {err}, total batches {num_batches}, time {now}')
+            print(f'dataset {k}, batch {j}, err {err}, total batches {num_batches},  seconds / batch {now - last_now}')
         
             # write down summary stats
-            now = time.time()
             if (now - last_summary_time) > summary_interval:
                 writer.add_scalar('train_error', err, it)
                 last_summary_time = now
@@ -156,8 +199,10 @@ def train(pretrained_model, directory_dataloader,
             if (now - last_checkpoint_time) > checkpoint_interval:
                 suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
                 model_path_ = model_path + suffix
+                # for parallel training
                 torch.save(finetuned_model.state_dict(), model_path_)
-        
+ 
+        # cross validation after each dataset is processed
         cv_err = 0
         for j, (cv_gene, cv_pos, cv_neg) in enumerate(test_dataloader):
             gv, pv, nv = tokenize(cv_gene, cv_pos, cv_neg, 
@@ -171,10 +216,7 @@ def train(pretrained_model, directory_dataloader,
             if 'cuda' in device:
                 torch.cuda.empty_cache()
              
-            # cap the number of cross validations
-            # if j > 100: continue                         
         writer.add_scalar('test_error', cv_err, it)
-
 
     return finetuned_model
 
@@ -184,8 +226,8 @@ def run(fasta_file, links_directory,
         training_column='Training',
         emb_dimension=100, num_neg=10,
         epochs=10, learning_rate=5e-5, 
-        warmup_steps=1000,
-        batch_size=10, num_workers=10,
+        warmup_steps=1000, gradient_accumulation_steps=1, 
+        batch_size=10, num_workers=10, fp16=False, 
         summary_interval=1, checkpoint_interval=1000,
         device='cpu'):
     """ Train interaction model
@@ -201,6 +243,13 @@ def run(fasta_file, links_directory,
         Number of embedding dimensions.
     num_neg : int
         Number of negative samples.
+    learning_rate : float
+        Learning rate of ADAM
+    warmup_steps : int
+        Number of warmup steps for scheduler
+    fp16 : bool
+        Specifies whether or not to use 16 bit precision.
+        Note that apex is required for this.
     checkpoint_path : path
         Path for roberta model.
     data_dir : path
@@ -237,8 +286,8 @@ def run(fasta_file, links_directory,
         pretrained_model, interaction_directory,
         logging_path, 
         emb_dimension, epochs, 
-        learning_rate, warmup_steps,
-        summary_interval, checkpoint_interval, 
+        learning_rate, warmup_steps, gradient_accumulation_steps,
+        fp16, summary_interval, checkpoint_interval, 
         model_path, device)
 
     # save the last model checkpoint

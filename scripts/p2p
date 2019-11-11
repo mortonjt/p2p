@@ -32,6 +32,8 @@ def p2p():
               help='Learning rate.', default=5e-5)
 @click.option('--warmup-steps',
               help='Warmup steps.', default=0)
+@click.option('--fp16',
+              help='16 bit precision.', default=False)
 @click.option('--batch-size',
               help='Number of sequences per batch for training.', default=10)
 @click.option('--num-workers',
@@ -45,12 +47,12 @@ def p2p():
 def interactions(fasta_file, links_directory,
                  checkpoint_path, data_dir, model_path, logging_path,
                  training_column, embedding_dimension, num_neg, epochs,
-                 learning_rate, warmup_steps,
+                 learning_rate, warmup_steps, fp16,
                  batch_size, num_workers, summary_interval, checkpoint_interval, 
                  arm_the_gpu):
     if arm_the_gpu:
         # pick out the first GPU
-        device_name = 'cuda:0'
+        device_name = 'cuda'
     else:
             device_name = 'cpu'
     print('links_directory', links_directory)
