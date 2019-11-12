@@ -31,21 +31,6 @@ class TestTraining(unittest.TestCase):
     # @unittest.skip("Run only in the presence of model or data")
     def test_run(self):
         # # single gpu
-        # os.environ["CUDA_VISIBLE_DEVICES"] = '1'
-        # acc1 = run(
-        #     self.fasta_file, self.links_file,
-        #     self.checkpoint, self.data_dir,
-        #     self.modelpath, self.logging,
-        #     training_column=2,
-        #     emb_dimension=100, num_neg=2,
-        #     epochs=1, learning_rate=5e-5, 
-        #     warmup_steps=0, fp16=False,
-        #     batch_size=4, num_workers=4,
-        #     summary_interval=100000,  
-        #     checkpoint_interval=100000,
-        #     device='cuda:0')
-
-        # multiple gpus
         acc1 = run(
             self.fasta_file, self.links_file,
             self.checkpoint, self.data_dir,
@@ -53,13 +38,27 @@ class TestTraining(unittest.TestCase):
             training_column=2,
             emb_dimension=100, num_neg=2,
             epochs=1, learning_rate=5e-5, 
-            warmup_steps=0, gradient_accumulation_steps=1,
-            fp16=False, batch_size=4, num_workers=12,            
-            summary_interval=60,  
-            checkpoint_interval=60,
-            device='cuda')
+            warmup_steps=0, fp16=False,
+            batch_size=4, num_workers=4,
+            summary_interval=100000,  
+            checkpoint_interval=100000,
+            device='cuda:0')
 
-        os.path.exists(self.modelpath)
+        # multiple gpus
+        # acc1 = run(
+        #     self.fasta_file, self.links_file,
+        #     self.checkpoint, self.data_dir,
+        #     self.modelpath, self.logging,
+        #     training_column=2,
+        #     emb_dimension=100, num_neg=2,
+        #     epochs=1, learning_rate=5e-5, 
+        #     warmup_steps=0, gradient_accumulation_steps=1,
+        #     fp16=False, batch_size=4, num_workers=12,            
+        #     summary_interval=60,  
+        #     checkpoint_interval=60,
+        #     device='cuda')
+        # 
+        # os.path.exists(self.modelpath)
 
 
 if __name__ == "__main__":

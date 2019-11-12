@@ -52,22 +52,20 @@ def encode(x):
 
 def tokenize(gene, pos, neg, model, device, pad=1024):
 
-    with torch.no_grad():
-        # extract features, and take <CLS> token
-        g = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], gene))
-        p = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], pos))
-        n = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], neg))
+    # extract features, and take <CLS> token
+    g = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], gene))
+    p = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], pos))
+    n = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], neg))
         
-        g = torch.cat(g, 0)
-        p = torch.cat(p, 0)
-        n = torch.cat(n, 0)
+    g = torch.cat(g, 0)
+    p = torch.cat(p, 0)
+    n = torch.cat(n, 0)
 
     g_ = g.to(device, non_blocking=True)
     p_ = p.to(device, non_blocking=True)
     n_ = n.to(device, non_blocking=True)
     return g_, p_, n_
 
-# @profile
 def train(pretrained_model, directory_dataloader,
           logging_path=None,
           emb_dimension=100, epochs=10, 
@@ -119,14 +117,15 @@ def train(pretrained_model, directory_dataloader,
     last_summary_time = time.time()
     last_checkpoint_time = time.time()
     # the dimensionality of the roberta model
-    roberta_dim = list(list(pretrained_model.parameters())[-1].shape)[0]
+    roberta_dim = int(list(list(pretrained_model.parameters())[-1].shape)[0])
     finetuned_model = RobertaConstrastiveHead(roberta_dim, emb_dimension)
+
     # optimizer = optim.Adamax(finetuned_model.parameters(), betas=betas)
-    t_total = directory_dataloader.total()
-    t_total = t_total // gradient_accumulation_steps
     optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
-    scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, 
-                                     t_total=t_total)
+    # uncomment for production ready code
+    # t_total = finetuned_model.total() // gradient_accumulated_steps
+    # scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total)
+    scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=300000 * 31)
     finetuned_model.to(device)
     if fp16:
         try:
@@ -140,7 +139,6 @@ def train(pretrained_model, directory_dataloader,
     if n_gpu > 1:
         finetuned_model = torch.nn.DataParallel(finetuned_model)
     
-
     # Initialize logging path
     if logging_path is None:
         basename = "logdir"
@@ -213,7 +211,7 @@ def train(pretrained_model, directory_dataloader,
                                   pretrained_model, device)
             cv = finetuned_model.forward(gv, pv, nv)
             cv_err += cv.item()
-            print(f'epoch {i}, batch {j}, cv_err {cv_err}, total batches {num_cv_batches}, time {now}')
+            print(f'dataset {k}, batch {j}, cv_err {cv_err}, total batches {num_cv_batches}, time {now}')
              
             #clean up
             del cv
@@ -279,9 +277,15 @@ def run(fasta_file, links_directory,
 
     pretrained_model = RobertaModel.from_pretrained(
         checkpoint_path, 'checkpoint_best.pt', data_dir)
+    pretrained_model.to(device)
 
+    # freeze the weights of the pre-trained model
+    for param in pretrained_model.parameters():
+        param.requires_grad = False
+    
     n_gpu = torch.cuda.device_count()
-    batch_size = batch_size * n_gpu
+    batch_size = max(batch_size, batch_size * n_gpu)
+    print('batch_size', batch_size)
     interaction_directory = InteractionDataDirectory(
         fasta_file, links_directory, training_column,
         batch_size, num_workers, device
