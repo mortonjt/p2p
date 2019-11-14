@@ -67,10 +67,12 @@ def parse(fasta_file, links_file, training_column=2,
     train_dataset = InteractionDataset(train_pairs)
     test_dataset = InteractionDataset(test_pairs)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
-                                  shuffle=False, num_workers=num_workers,
+                                  shuffle=True, num_workers=num_workers,
                                   drop_last=True, pin_memory=arm_the_gpu)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
-                                 drop_last=True, shuffle=False,
+
+    test_batch_size = max(batch_size, len(test_dataset) - 1)
+    test_dataloader = DataLoader(test_dataset, batch_size=test_batch_size,
+                                 drop_last=False, shuffle=False,
                                  num_workers=num_workers,
                                  pin_memory=arm_the_gpu)
     return train_dataloader, test_dataloader
@@ -98,7 +100,8 @@ class InteractionDataDirectory(Dataset):
         for fname in self.filenames:
             res = parse(self.fasta_file, fname, self.training_column,
                         self.batch_size, self.num_workers, self.arm_the_gpu)
-            t += len(res[0])
+            # number of sequences in a dataset = (num batch) x (batch size)
+            t += len(res[0]) * res[0].batch_size
         return t            
         
     def __iter__(self):
