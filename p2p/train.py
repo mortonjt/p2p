@@ -115,14 +115,20 @@ def train(pretrained_model, directory_dataloader,
     # optimizer = optim.Adamax(finetuned_model.parameters(), betas=betas)
     optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
     # uncomment for production ready code
-    if max_steps > 0:
-        num_data = directory_dataloader.total()    
-        t_total = (max_steps // gradient_accumulation_steps) + 1
-        epochs = t_total // num_data
-    else:
-        num_data = directory_dataloader.total()
-        t_total = num_data // gradient_accumulation_steps 
-        epochs = 1
+    # if max_steps > 0:
+    #     num_data = directory_dataloader.total()    
+    #     t_total = (max_steps // gradient_accumulation_steps) + 1
+    #     epochs = t_total // num_data
+    # else:
+    #     num_data = directory_dataloader.total()
+    #     t_total = num_data // gradient_accumulation_steps 
+    #     epochs = 1
+
+    # test run
+    num_data = 3e6
+    t_total = (max_steps // gradient_accumulation_steps) + 1
+    epochs = int(t_total // num_data)
+    
     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
     # quick and dirty scheduler
     #scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=300000 * 31)
@@ -132,7 +138,7 @@ def train(pretrained_model, directory_dataloader,
     print("Utilizing ", torch.cuda.device_count(), device)
     if n_gpu > 1:
         finetuned_model = torch.nn.DataParallel(finetuned_model)
-    
+   
     # Initialize logging path
     if logging_path is None:
         basename = "logdir"

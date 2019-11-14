@@ -26,11 +26,11 @@ def p2p():
               help='Number of embedding dimensions to model interactions', default=100)
 @click.option('--num-neg',
               help='Number of negative samples.', default=2)
-@click.option('--epochs',
+@click.option('--max-steps', default=0, type=int,
               help=('Maximum number of steps to run for. Each step corresponds to'
                     'the evaluation of a protein pair. If this is zero, then it will'
                     'default to one epochs worth of protein pairs (ie one pass through'
-                    'all of the protein pairs in the training dataset).')
+                    'all of the protein pairs in the training dataset).'))
 @click.option('--learning-rate',
               help='Learning rate.', default=5e-5)
 @click.option('--warmup-steps',
