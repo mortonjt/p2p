@@ -57,14 +57,10 @@ def tokenize(gene, pos, neg, model, device, pad=1024):
     p = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], pos))
     n = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], neg))
         
-    g = torch.cat(g, 0)
-    p = torch.cat(p, 0)
-    n = torch.cat(n, 0)
+    g_ = torch.cat(g, 0)
+    p_ = torch.cat(p, 0)
+    n_ = torch.cat(n, 0)
     
-    # q : is this unnecessary?
-    g_ = g.to(device, non_blocking=True)
-    p_ = p.to(device, non_blocking=True)
-    n_ = n.to(device, non_blocking=True)
     return g_, p_, n_
 
 def train(pretrained_model, directory_dataloader,
@@ -155,7 +151,8 @@ def train(pretrained_model, directory_dataloader,
             num_batches = len(train_dataloader)
             num_cv_batches = len(test_dataloader)
         
-            print(f'dataset {k}, num_batches {num_batches}, num_cvs {num_cv_batches}, seconds / batch {now - last_now}')
+            print(f'dataset {k}, num_batches {num_batches}, num_cvs {num_cv_batches}, '
+                  f'seconds / batch {now - last_now}')
             finetuned_model.train()
             for j, (gene, pos, neg) in enumerate(train_dataloader):
                 last_now = now
