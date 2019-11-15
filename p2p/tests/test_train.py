@@ -16,7 +16,8 @@ class TestTraining(unittest.TestCase):
     def setUp(self):
         self.fasta_file = get_data_path('prots.fa')
         self.links_file = os.path.abspath('data/links_files')
-        self.logging = 'logging'
+        self.logging1 = 'logging1'
+        self.logging2 = 'logging2'
         self.modelpath = 'model.pkt'
 
         # not ideal :(
@@ -34,10 +35,23 @@ class TestTraining(unittest.TestCase):
         acc1 = run(
             self.fasta_file, self.links_file,
             self.checkpoint, self.data_dir,
-            self.modelpath, self.logging,
+            self.modelpath, self.logging1,
             training_column=2,
             emb_dimension=10, num_neg=10,
-            max_steps=1000, learning_rate=5e-5, 
+            max_steps=500, learning_rate=5e-5, 
+            warmup_steps=0, 
+            batch_size=4, num_workers=4,
+            summary_interval=1,  
+            checkpoint_interval=100000,
+            device='cuda:0')
+
+        acc2 = run(
+            self.fasta_file, self.links_file,
+            self.checkpoint, self.data_dir,
+            self.modelpath, self.logging2,
+            training_column=2,
+            emb_dimension=10, num_neg=10,
+            max_steps=500, learning_rate=5e-5, 
             warmup_steps=0, 
             batch_size=4, num_workers=4,
             summary_interval=1,  

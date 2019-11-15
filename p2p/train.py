@@ -104,7 +104,6 @@ def train(pretrained_model, directory_dataloader,
     Returns
     -------
     finetuned_model : p2p.transformer.RobertaConstrastiveHead
-
     """
     last_summary_time = time.time()
     last_checkpoint_time = time.time()
@@ -116,7 +115,7 @@ def train(pretrained_model, directory_dataloader,
     optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
     # uncomment for production ready code
     if max_steps > 0:
-        num_data = directory_dataloader.total()    
+        num_data = directory_dataloader.total()
         t_total = (max_steps // gradient_accumulation_steps) + 1
         epochs = t_total // num_data
     else:
@@ -146,6 +145,10 @@ def train(pretrained_model, directory_dataloader,
         logging_path = "_".join([basename, suffix])
     it = 0
     writer = SummaryWriter(logging_path)
+
+    # metrics to report
+    err, cv_err, tpr, pos_score, batch_size = 0, 0, 0, 0, 0
+
     now = time.time()
     last_now = time.time()
     print('Number of pairs', num_data)
@@ -157,6 +160,7 @@ def train(pretrained_model, directory_dataloader,
             train_dataloader, test_dataloader = dataloader
             num_batches = len(train_dataloader)
             num_cv_batches = len(test_dataloader)
+            batch_size = train_dataloader.batch_size
         
             print(f'dataset {k}, num_batches {num_batches}, num_cvs {num_cv_batches}, '
                   f'seconds / batch {now - last_now}')
@@ -208,9 +212,7 @@ def train(pretrained_model, directory_dataloader,
      
             # cross validation after each dataset is processed
             with torch.no_grad():        
-                cv_err = 0
-                tpr = 0
-                pos_score = 0
+                cv_err, tpr, pos_score = 0, 0, 0
                 for j, (cv_gene, cv_pos, cv_neg) in enumerate(test_dataloader):
                     gv, pv, nv = tokenize(cv_gene, cv_pos, cv_neg, 
                                           pretrained_model, device)
@@ -234,6 +236,23 @@ def train(pretrained_model, directory_dataloader,
                     writer.add_scalar('test_error', cv_err, it)
                     writer.add_scalar('TPR', tpr, it)
                     writer.add_scalar('pos_score', pos_score, it)
+
+        # save hparams
+    writer.add_hparams(
+        hparam_dict={
+            'emb_dimension': emb_dimension, 
+            'learning_rate': learning_rate, 
+            'warmup_steps': warmup_steps,
+            'gradient_accumulation_steps': gradient_accumulation_steps,
+            'batch_size': batch_size
+            },           
+        metric_dict={
+            'train_error': err,
+            'test_error': cv_err,
+            'TPR': tpr,
+            'pos_score': pos_score
+        }
+    )
 
     writer.close()
     return finetuned_model
