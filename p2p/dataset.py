@@ -70,7 +70,7 @@ def parse(fasta_file, links_file, training_column=2,
                                   shuffle=True, num_workers=num_workers,
                                   drop_last=True, pin_memory=arm_the_gpu)
 
-    test_batch_size = max(batch_size, len(test_dataset) - 1)
+    test_batch_size = max(batch_size, 1)
     test_dataloader = DataLoader(test_dataset, batch_size=test_batch_size,
                                  drop_last=False, shuffle=False,
                                  num_workers=num_workers,

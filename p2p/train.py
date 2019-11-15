@@ -8,7 +8,7 @@ import torch.optim as optim
 from fairseq.models.roberta import RobertaModel
 from p2p.transformer import RobertaConstrastiveHead
 from p2p.dataset import InteractionDataDirectory
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 from transformers import AdamW, WarmupLinearSchedule
 
 
@@ -115,19 +115,19 @@ def train(pretrained_model, directory_dataloader,
     # optimizer = optim.Adamax(finetuned_model.parameters(), betas=betas)
     optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
     # uncomment for production ready code
-    # if max_steps > 0:
-    #     num_data = directory_dataloader.total()    
-    #     t_total = (max_steps // gradient_accumulation_steps) + 1
-    #     epochs = t_total // num_data
-    # else:
-    #     num_data = directory_dataloader.total()
-    #     t_total = num_data // gradient_accumulation_steps 
-    #     epochs = 1
+    if max_steps > 0:
+        num_data = directory_dataloader.total()    
+        t_total = (max_steps // gradient_accumulation_steps) + 1
+        epochs = t_total // num_data
+    else:
+        num_data = directory_dataloader.total()
+        t_total = num_data // gradient_accumulation_steps 
+        epochs = 1
 
     # test run
-    num_data = 3e6
-    t_total = (max_steps // gradient_accumulation_steps) + 1
-    epochs = int(t_total // num_data)
+    # num_data = 3e6
+    # t_total = (max_steps // gradient_accumulation_steps) + 1
+    # epochs = int(t_total // num_data)
     
     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
     # quick and dirty scheduler
@@ -153,13 +153,13 @@ def train(pretrained_model, directory_dataloader,
     print('Number of epochs', epochs)
     for e in range(epochs):
         for k, dataloader in enumerate(directory_dataloader):
+            finetuned_model.train()
             train_dataloader, test_dataloader = dataloader
             num_batches = len(train_dataloader)
             num_cv_batches = len(test_dataloader)
         
             print(f'dataset {k}, num_batches {num_batches}, num_cvs {num_cv_batches}, '
                   f'seconds / batch {now - last_now}')
-            finetuned_model.train()
             for j, (gene, pos, neg) in enumerate(train_dataloader):
                 last_now = now
                 now = time.time()
@@ -180,7 +180,6 @@ def train(pretrained_model, directory_dataloader,
                     scheduler.step() 
                     finetuned_model.zero_grad()            
     
-                # clean up
                 it += len(gene)
                 err = loss.item()
                 print(f'epoch {e}, dataset {k}, batch {j}, err {err}, total batches {num_batches}, '
@@ -191,7 +190,8 @@ def train(pretrained_model, directory_dataloader,
                     writer.add_scalar('train_error', err, it)
                     last_summary_time = now
                                  
-                del loss
+                # clean up
+                del loss, g, p, n
                 if 'cuda' in device:
                     torch.cuda.empty_cache()
             
@@ -207,33 +207,35 @@ def train(pretrained_model, directory_dataloader,
                     last_checkpoint_time = now
      
             # cross validation after each dataset is processed
-            cv_err = 0
-            tpr = 0
-            pos_score = 0
-            for j, (cv_gene, cv_pos, cv_neg) in enumerate(test_dataloader):
-                gv, pv, nv = tokenize(cv_gene, cv_pos, cv_neg, 
-                                      pretrained_model, device)
-                # pos = finetuned_model.predict(gv, pv)
-                # neg = finetuned_model.predict(gv, pv)
-                cv_score = finetuned_model.forward(gv, pv, nv)
-                cv_err += cv_score.item()             
-                pred = finetuned_model.predict(gv, pv)
-                pos_score += torch.mean(pred).item()
-                tpr += torch.sum(pred > 0).item()
-                #clean up
-                del pred
-                del cv_score
-                if 'cuda' in device:
-                    torch.cuda.empty_cache()            
-    
-            if len(test_dataloader) > 0:
-                cv_err = cv_err / len(test_dataloader)
-                tpr = tpr / len(test_dataloader)
-                print(f'epoch {e}, dataset {k}, batch {j}, cv_err {cv_err}, tpr {tpr}, avg pos {pos_score}, '
-                      f'total batches {num_cv_batches}, seconds / batch {now - last_now}')
-                writer.add_scalar('test_error', cv_err, it)
-                writer.add_scalar('TPR', tpr, it)
-                writer.add_scalar('pos_score', pos_score, it)
+            with torch.no_grad():        
+                cv_err = 0
+                tpr = 0
+                pos_score = 0
+                for j, (cv_gene, cv_pos, cv_neg) in enumerate(test_dataloader):
+                    gv, pv, nv = tokenize(cv_gene, cv_pos, cv_neg, 
+                                          pretrained_model, device)
+                    cv_score = finetuned_model.forward(gv, pv, nv)
+                    pred = finetuned_model.predict(gv, pv)
+                    cv_err += cv_score.item()             
+                    pos_score += torch.mean(pred).item()
+                    pos_counts = torch.sum(pred > 0)
+                    tpr += pos_counts.item()
+                    #clean up
+                    del pred, cv_score, pos_counts, gv, pv, nv
+                    if 'cuda' in device:
+                        torch.cuda.empty_cache()            
+        
+                if len(test_dataloader) > 0:
+                    cv_err = cv_err / len(test_dataloader)
+                    pos_score = pos_score / len(test_dataloader)
+                    tpr = tpr / len(test_dataloader)
+                    print(f'epoch {e}, dataset {k}, batch {j}, cv_err {cv_err}, tpr {tpr}, avg pos {pos_score}, '
+                          f'total batches {num_cv_batches}, seconds / batch {now - last_now}')
+                    writer.add_scalar('test_error', cv_err, it)
+                    writer.add_scalar('TPR', tpr, it)
+                    writer.add_scalar('pos_score', pos_score, it)
+
+    writer.close()
     return finetuned_model
 
 

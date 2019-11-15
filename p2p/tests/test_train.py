@@ -37,10 +37,10 @@ class TestTraining(unittest.TestCase):
             self.modelpath, self.logging,
             training_column=2,
             emb_dimension=10, num_neg=10,
-            max_steps=100, learning_rate=5e-5, 
+            max_steps=1000, learning_rate=5e-5, 
             warmup_steps=0, 
             batch_size=4, num_workers=4,
-            summary_interval=100000,  
+            summary_interval=1,  
             checkpoint_interval=100000,
             device='cuda:0')
 
