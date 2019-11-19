@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.utils as utils
 import torch.nn.functional as F
+import math
 
 
 class RobertaClassificationHead(nn.Module):
@@ -44,9 +45,9 @@ class RobertaConstrastiveHead(nn.Module):
         self.init_emb()
 
     def init_emb(self):
-        initrange = 0.5 / self.emb_dimension
-        self.u_embeddings.weight.data.uniform_(-initrange, initrange)
-        self.v_embeddings.weight.data.uniform_(-initrange, initrange)
+        initstd = 1 / math.sqrt(self.emb_dimension)
+        self.u_embeddings.weight.data.normal_(0, initstd)
+        self.v_embeddings.weight.data.normal_(0, initstd)
 
     def forward(self, pos_u, pos_v, neg_v):
         # only take <s> token for pos_u, pos_v, and neg_v
@@ -59,7 +60,7 @@ class RobertaConstrastiveHead(nn.Module):
         score = F.logsigmoid(score)
         if score.dim() >= 1:
             losses += sum(score)
-        else: 
+        else:
             losses += score
         neg_emb_v = self.v_embeddings(neg_v)
         neg_score = torch.bmm(neg_emb_v.unsqueeze(1), emb_u.unsqueeze(2)).squeeze()
