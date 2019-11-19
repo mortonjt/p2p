@@ -75,5 +75,5 @@ class RobertaConstrastiveHead(nn.Module):
         emb_u = self.u_embeddings(pos_u)
         emb_v = self.v_embeddings(pos_v)
         score = torch.mul(emb_u, emb_v).squeeze()
-        score = F.logsigmoid(score)
+        score = F.logsigmoid(torch.sum(score, -1))
         return score

@@ -129,8 +129,8 @@ def train(pretrained_model, directory_dataloader,
     # epochs = int(t_total // num_data)
 
     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
-    # quick and dirty scheduler for debugging
-    # scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=300000 * 31)
+    # quick and dirty scheduler
+    #scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=300000 * 31)
     finetuned_model.to(device)
     n_gpu = torch.cuda.device_count()
     print(os.environ["CUDA_VISIBLE_DEVICES"], 'devices available')
@@ -215,7 +215,8 @@ def train(pretrained_model, directory_dataloader,
 
             # cross validation after each dataset is processed
             with torch.no_grad():
-                cv_err, tpr, pos_score = 0, 0, 0
+                cv_err, pos_score, rank_counts = 0, 0, 0
+                batch_size = test_dataloader.batch_size
                 for j, (cv_gene, cv_pos, cv_neg) in enumerate(test_dataloader):
                     gv, pv, nv = tokenize(cv_gene, cv_pos, cv_neg,
                                           pretrained_model, device)
@@ -223,17 +224,26 @@ def train(pretrained_model, directory_dataloader,
                     pred_pos = finetuned_model.predict(gv, pv)
                     pred_neg = finetuned_model.predict(gv, nv)
                     cv_err += cv_score.item()
-                    rank_counts = torch.sum(pred_pos > pred_neg)
-                    tpr += rank_counts.item()
+                    pos_score += torch.sum(pred_pos).item()
+                    rank_counts += torch.sum(pred_pos > pred_neg).item()
+                    print(f'epoch {e}, dataset {k}, batch {j}, cv_err {cv_err}, '
+                          f'rank_counts {rank_counts}, '
+                          f'total batches {num_cv_batches}, '
+                          f'seconds / batch {now - last_now}')
+
                     #clean up
-                    del pred_pos, pred_neg, cv_score, rank_counts, gv, pv, nv
+                    del pred_pos, pred_neg, cv_score, gv, pv, nv
                     if 'cuda' in device:
                         torch.cuda.empty_cache()
 
                 if len(test_dataloader) > 0:
                     cv_err = cv_err / len(test_dataloader)
-                    tpr = tpr / len(test_dataloader)
-                    print(f'epoch {e}, dataset {k}, batch {j}, cv_err {cv_err}, rank_tpr {tpr}, '
+                    avg_rank = rank_counts / len(test_dataloader)
+                    tpr = avg_rank / batch_size
+                    pos_score = pos_score / len(test_dataloader)
+                    print(f'epoch {e}, dataset {k}, batch {j}, cv_err {cv_err}, '
+                          f'rank_counts {avg_rank}, tpr {tpr}, '
+                          f'pos_score {pos_score}, '
                           f'total batches {num_cv_batches}, '
                           f'seconds / batch {now - last_now}')
                     writer.add_scalar('test_error', cv_err, it)
