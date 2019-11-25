@@ -6,8 +6,8 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 from fairseq.models.roberta import RobertaModel
-from p2p.transformer import RobertaConstrastiveHead
-from p2p.dataset import InteractionDataDirectory
+from poplar.transformer import RobertaConstrastiveHead
+from poplar.dataset import InteractionDataDirectory
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils import clip_grad_norm_
 from transformers import AdamW, WarmupLinearSchedule
@@ -103,7 +103,7 @@ def train(pretrained_model, directory_dataloader,
 
     Returns
     -------
-    finetuned_model : p2p.transformer.RobertaConstrastiveHead
+    finetuned_model : poplar.transformer.RobertaConstrastiveHead
     """
     last_summary_time = time.time()
     last_checkpoint_time = time.time()
