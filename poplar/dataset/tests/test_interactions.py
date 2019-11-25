@@ -14,7 +14,7 @@ class TestPreprocess(unittest.TestCase):
 
     def test_preprocess(self):
         seqs = list(SeqIO.parse(self.fasta_file, format='fasta'))
-        links = pd.read_table(self.links_file)
+        links = pd.read_table(self.links_file, header=None)
         truncseqs = list(map(clean, seqs))
         seqids = list(map(lambda x: x.id, truncseqs))
         seqdict = dict(zip(seqids, truncseqs))
@@ -29,7 +29,7 @@ class TestInteractionDataset(unittest.TestCase):
         self.fasta_file = get_data_path('prots.fa')
 
         seqs = list(SeqIO.parse(self.fasta_file, format='fasta'))
-        links = pd.read_table(self.links_file)
+        links = pd.read_table(self.links_file, header=None)
 
         truncseqs = list(map(clean, seqs))
         seqids = list(map(lambda x: x.id, truncseqs))
@@ -53,6 +53,7 @@ class TestInteractionDataset(unittest.TestCase):
             'AEAEQARVSVRNIRRDALAQLKDLQKEKEISEDEERRAGDDVQKLTDKFIGEIEKALEA'
             'KEADLMAV'
         )
+
         exp_pos = list(
             'MMRSHYCGQLNESLDGQEVTLCGWVHRRRDHGGVIFLDVRDREGLAQVVFDPDRAETFA'
             'KADRVRSEFVVKITGKVRLRPEGARNPNMASGSIEVLGYELEVLNQAETPPFPLDEYSD'
