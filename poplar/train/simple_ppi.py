@@ -8,69 +8,20 @@ import torch.optim as optim
 from fairseq.models.roberta import RobertaModel
 from poplar.transformer import RobertaConstrastiveHead
 from poplar.dataset import InteractionDataDirectory
+from poplar.util import encode, tokenize
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils import clip_grad_norm_
 from transformers import AdamW, WarmupLinearSchedule
 
 
-dictionary = {
-    "A": 1,
-    "B": 2,
-    "C": 3,
-    "D": 4,
-    "E": 5,
-    "F": 6,
-    "G": 7,
-    "H": 8,
-    "I": 9,
-    "J": 10,
-    "K": 11,
-    "L": 12,
-    "M": 13,
-    "N": 14,
-    "O": 15,
-    "P": 16,
-    "Q": 17,
-    "R": 18,
-    "S": 19,
-    "T": 20,
-    "U": 21,
-    "V": 22,
-    "W": 23,
-    "X": 24,
-    "Y": 25,
-    "Z": 26,
-    ".": 27
-}
-
-
-def encode(x):
-    """ Convert string to tokens. """
-    tokens = list(map(lambda i: dictionary[i], list(x)))
-    tokens = torch.Tensor(tokens)
-    tokens = tokens.long()
-    return tokens
-
-def tokenize(gene, pos, neg, model, device, pad=1024):
-
-    # extract features, and take <CLS> token
-    g = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], gene))
-    p = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], pos))
-    n = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], neg))
-
-    g_ = torch.cat(g, 0)
-    p_ = torch.cat(p, 0)
-    n_ = torch.cat(n, 0)
-
-    return g_, p_, n_
-
-def train(pretrained_model, directory_dataloader,
-          logging_path=None,
-          emb_dimension=100, max_steps=0,
-          learning_rate=5e-5, warmup_steps=1000,
-          gradient_accumulation_steps=1,
-          clip_norm=10., summary_interval=100, checkpoint_interval=100,
-          model_path='model', device=None):
+def simple_ppitrain(
+        pretrained_model, directory_dataloader,
+        logging_path=None,
+        emb_dimension=100, max_steps=0,
+        learning_rate=5e-5, warmup_steps=1000,
+        gradient_accumulation_steps=1,
+        clip_norm=10., summary_interval=100, checkpoint_interval=100,
+        model_path='model', device=None):
     """ Train the roberta model
 
     Parameters
@@ -261,7 +212,8 @@ def train(pretrained_model, directory_dataloader,
     return finetuned_model
 
 
-def run(fasta_file, links_directory,
+def simple_ppirun(
+        fasta_file, links_directory,
         checkpoint_path, data_dir, model_path, logging_path,
         training_column='Training',
         emb_dimension=100, num_neg=10,

@@ -1,5 +1,6 @@
 import os
 import inspect
+import torch
 
 
 def get_data_path(fn, subfolder='data'):
@@ -32,3 +33,57 @@ def get_data_path(fn, subfolder='data'):
     path = os.path.dirname(os.path.abspath(callers_filename))
     data_path = os.path.join(path, subfolder, fn)
     return data_path
+
+
+
+dictionary = {
+    "A": 1,
+    "B": 2,
+    "C": 3,
+    "D": 4,
+    "E": 5,
+    "F": 6,
+    "G": 7,
+    "H": 8,
+    "I": 9,
+    "J": 10,
+    "K": 11,
+    "L": 12,
+    "M": 13,
+    "N": 14,
+    "O": 15,
+    "P": 16,
+    "Q": 17,
+    "R": 18,
+    "S": 19,
+    "T": 20,
+    "U": 21,
+    "V": 22,
+    "W": 23,
+    "X": 24,
+    "Y": 25,
+    "Z": 26,
+    ".": 27
+}
+
+
+def encode(x):
+    """ Convert string to tokens. """
+    tokens = list(map(lambda i: dictionary[i], list(x)))
+    tokens = torch.Tensor(tokens)
+    tokens = tokens.long()
+    return tokens
+
+
+def tokenize(gene, pos, neg, model, device, pad=1024):
+
+    # extract features, and take <CLS> token
+    g = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], gene))
+    p = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], pos))
+    n = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], neg))
+
+    g_ = torch.cat(g, 0)
+    p_ = torch.cat(p, 0)
+    n_ = torch.cat(n, 0)
+
+    return g_, p_, n_

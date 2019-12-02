@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from poplar.train import run
+from poplar.train import simple_ppirun
 import click
 
 
@@ -51,7 +51,7 @@ def poplar():
               help='Checkpoint interval in seconds', default=7200)
 @click.option('--arm-the-gpu', is_flag=True,
               help='Specifies whether or not to use the GPU.', default=False)
-def simple_contact(fasta_file, links_directory,
+def simple_ppi(fasta_file, links_directory,
                    checkpoint_path, data_dir, model_path, logging_path,
                    training_column, embedding_dimension, num_neg, max_steps,
                    learning_rate, warmup_steps, gradient_accumulation_steps,
@@ -63,7 +63,7 @@ def simple_contact(fasta_file, links_directory,
     else:
             device_name = 'cpu'
     print('links_directory', links_directory)
-    run(fasta_file, links_directory,
+    simple_ppirun(fasta_file, links_directory,
         checkpoint_path, data_dir,
         model_path, logging_path,
         training_column=training_column,
@@ -78,4 +78,4 @@ def simple_contact(fasta_file, links_directory,
         device=device_name)
 
 if __name__ == "__main__":
-    simple_contact()
+    simple_ppi()
