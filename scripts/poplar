@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-from p2p.train import run
+from poplar.train import simple_ppirun
 import click
 
 
 @click.group()
-def p2p():
+def poplar():
     pass
 
-@p2p.command()
+@poplar.command()
 @click.option('--fasta-file',
               help='Input sequences in fasta format.')
 @click.option('--links-directory',
@@ -51,19 +51,19 @@ def p2p():
               help='Checkpoint interval in seconds', default=7200)
 @click.option('--arm-the-gpu', is_flag=True,
               help='Specifies whether or not to use the GPU.', default=False)
-def interactions(fasta_file, links_directory,
-                 checkpoint_path, data_dir, model_path, logging_path,
-                 training_column, embedding_dimension, num_neg, max_steps,
-                 learning_rate, warmup_steps, gradient_accumulation_steps,
-                 clip_norm, batch_size, num_workers,
-                 summary_interval, checkpoint_interval, arm_the_gpu):
+def simple_ppi(fasta_file, links_directory,
+                   checkpoint_path, data_dir, model_path, logging_path,
+                   training_column, embedding_dimension, num_neg, max_steps,
+                   learning_rate, warmup_steps, gradient_accumulation_steps,
+                   clip_norm, batch_size, num_workers,
+                   summary_interval, checkpoint_interval, arm_the_gpu):
     if arm_the_gpu:
         # pick out the first GPU
         device_name = 'cuda'
     else:
             device_name = 'cpu'
     print('links_directory', links_directory)
-    run(fasta_file, links_directory,
+    simple_ppirun(fasta_file, links_directory,
         checkpoint_path, data_dir,
         model_path, logging_path,
         training_column=training_column,
@@ -78,4 +78,4 @@ def interactions(fasta_file, links_directory,
         device=device_name)
 
 if __name__ == "__main__":
-    interactions()
+    simple_ppi()

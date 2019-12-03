@@ -1,14 +1,14 @@
 import os
 import unittest
-from p2p.train import run, train
-from p2p.util import get_data_path
+from poplar.train import run, train
+from poplar.util import get_data_path
 import shutil
 
 # import numpy as np
-# from p2p.util import get_data_path
+# from poplar.util import get_data_path
 # import pandas as pd
 # from Bio import SeqIO
-# from p2p.dataset import InteractionDataset
+# from poplar.dataset import InteractionDataset
 
 
 class TestTraining(unittest.TestCase):

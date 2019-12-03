@@ -102,15 +102,15 @@ class InteractionDataDirectory(Dataset):
                         self.batch_size, self.num_workers, self.arm_the_gpu)
             # number of sequences in a dataset = (num batch) x (batch size)
             t += len(res[0]) * res[0].batch_size
-        return t            
-        
+        return t
+
     def __iter__(self):
         return (
             parse(self.fasta_file, fname, self.training_column,
                   self.batch_size, self.num_workers, self.arm_the_gpu)
             for fname in self.filenames
         )
- 
+
 
 class InteractionDataset(Dataset):
 

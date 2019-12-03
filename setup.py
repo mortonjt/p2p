@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # ----------------------------------------------------------------------------
-# Copyright (c) 2019--, p2p development team.
+# Copyright (c) 2019--, poplar development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -34,23 +34,23 @@ with open('README.md') as f:
 # version parsing from __init__ pulled from Flask's setup.py
 # https://github.com/mitsuhiko/flask/blob/master/setup.py
 _version_re = re.compile(r'__version__\s+=\s+(.*)')
-with open('p2p/__init__.py', 'rb') as f:
+with open('poplar/__init__.py', 'rb') as f:
     hit = _version_re.search(f.read().decode('utf-8')).group(1)
     version = str(ast.literal_eval(hit))
 
 
-setup(name='p2p',
+setup(name='poplar',
       version=version,
       license='BSD-3-Clause',
       description=description,
       long_description=long_description,
       long_description_content_type='text/markdown',
-      author="p2p development team",
+      author="poplar development team",
       author_email="jamietmorton@gmail.com",
-      maintainer="p2p development team",
+      maintainer="poplar development team",
       maintainer_email="jamietmorton@gmail.com",
       packages=find_packages(),
-      scripts=glob('scripts/p2p'),
+      scripts=glob('scripts/poplar'),
       install_requires=[
           'biopython',
           'numpy >= 1.9.2',
