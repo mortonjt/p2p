@@ -78,4 +78,4 @@ def simple_ppi(fasta_file, links_directory,
         device=device_name)
 
 if __name__ == "__main__":
-    simple_ppi()
+    poplar()
