@@ -295,7 +295,7 @@ def simple_ppirun(
     )
 
     # train the fine_tuned model parameters
-    finetuned_model = train(
+    finetuned_model = simple_ppitrain(
         pretrained_model, interaction_directory,
         logging_path,
         emb_dimension, max_steps,

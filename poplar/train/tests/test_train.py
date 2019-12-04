@@ -1,6 +1,6 @@
 import os
 import unittest
-from poplar.train import run, train
+from poplar.train.simple_ppi import simple_ppirun, simple_ppitrain
 from poplar.util import get_data_path
 import shutil
 
@@ -42,7 +42,7 @@ class TestTraining(unittest.TestCase):
         # check -
         # 1. the variance of error estimate
         # 2. the gradients
-        acc1 = run(
+        acc1 = simple_ppirun(
             self.fasta_file, self.links_file,
             self.checkpoint, self.data_dir,
             self.modelpath, self.logging1,
