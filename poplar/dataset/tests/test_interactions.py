@@ -3,7 +3,9 @@ import numpy as np
 from poplar.util import get_data_path
 import pandas as pd
 from Bio import SeqIO
-from poplar.dataset import InteractionDataset, parse, preprocess, clean
+from poplar.dataset.interactions import (
+    InteractionDataset, parse, preprocess,
+    clean, dictionary)
 
 
 class TestPreprocess(unittest.TestCase):
@@ -36,11 +38,22 @@ class TestInteractionDataset(unittest.TestCase):
         seqdict = dict(zip(seqids, truncseqs))
         self.pairs = preprocess(seqdict, links)
 
+    def test_random_peptide_draw(self):
+        np.random.seed(0)
+        intsd = InteractionDataset(self.pairs)
+        seq = intsd.random_peptide_draw()
+        self.assertEqual(len(seq), 200)
+
     def test_random_peptide(self):
         np.random.seed(0)
         intsd = InteractionDataset(self.pairs)
         seq = intsd.random_peptide()
-        self.assertEqual(len(seq), 200)
+        self.assertGreater(len(seq), 30)
+        self.assertLess(len(seq), 1024)
+        self.assertTrue(
+            set(seq).issubset(set(dictionary.keys()))
+        )
+        self.assertNotIn('.', seq)
 
     def test_getitem(self):
         np.random.seed(0)
@@ -67,11 +80,18 @@ class TestInteractionDataset(unittest.TestCase):
             'LAFGLDRLVMLMTGASSIREVIAFPKTQSAGDVMTQAPGSVDGKALRELHIRLREQPKAE'
         )
         exp_neg = list(
-            'MDLFADAPLTLPDADLRYLPHWLDAPLASAWLLRLEQETPWEQPILRIHGEEHPTPRLV'
-            'AWYGDPDAAYRYSGQVHRPLPWTALLGEIRERVEREVGQRVNGVLLNYYRDGQDSMGWH'
-            'SDDEPELRRDPLVASLSLGGSRRFDLRRKGQTRIAHSLELTHGSLLVMRGATQHHWQHQ'
-            'VAKTRRSCMPRLNLTFRLVYPQP'
+            'DDHJTVSEXGYYMBGHXOYRFZNIJUTQTFPPASDYRTTTOHABJZAKUXDLSXCAAEV'
+            'FGIURPEJKYBBHJZDGXLOSAODVMZKULEGEPUDMEUIOPUDXPNVVQRFJDAFARS'
+            'ECQDCKNQHVJAKSLXCZCDDSODURSOJBEKWLILCTQAWAGTOKTYINYCDCLNQII'
+            'TICYUDMOAEDNLWNZNLYQYVOZQZWVTBIAEZGVNHYYPJSIWPLGPZBWMYYDSPD'
+            'KMGDWFXLALIUKWLFPICTZXVTOUVDDHJJJXDOSMDJKNHHVBMCCYBFIEALCFV'
+            'QIBRQDY'
         )
+
+        # 'MDLFADAPLTLPDADLRYLPHWLDAPLASAWLLRLEQETPWEQPILRIHGEEHPTPRLV'
+        # 'AWYGDPDAAYRYSGQVHRPLPWTALLGEIRERVEREVGQRVNGVLLNYYRDGQDSMGWH'
+        # 'SDDEPELRRDPLVASLSLGGSRRFDLRRKGQTRIAHSLELTHGSLLVMRGATQHHWQHQ'
+        # 'VAKTRRSCMPRLNLTFRLVYPQP'
         self.assertListEqual(list(gene), exp_gene)
         self.assertListEqual(list(pos), exp_pos)
         self.assertListEqual(list(neg), exp_neg)

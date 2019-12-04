@@ -2,6 +2,7 @@ import torch
 import glob
 import math
 from torch.utils.data import Dataset, DataLoader, RandomSampler
+from poplar.util import dictionary, check_random_state
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
@@ -114,7 +115,7 @@ class InteractionDataDirectory(Dataset):
 
 class InteractionDataset(Dataset):
 
-    def __init__(self, pairs, num_neg=10):
+    def __init__(self, pairs, num_neg=10, seed=0):
         """ Read in pairs of proteins
 
         Parameters
@@ -125,11 +126,27 @@ class InteractionDataset(Dataset):
         """
         self.pairs = pairs
         self.num_neg = num_neg
+        self.state = check_random_state(seed)
+
+
+    def random_peptide_draw(self):
+        i = self.state.randint(0, len(self.pairs))
+        j = int(np.round(self.state.random()))
+        return self.pairs[i, j]
 
     def random_peptide(self):
-        i = np.random.randint(0, len(self.pairs))
-        j = int(np.round(np.random.random()))
-        return self.pairs[i, j]
+        # randomly generate a length
+        # the average peptide has 300 residues
+        l = self.state.poisson(300)
+        l = max(30, l)
+        l = min(1024, l)
+
+        res = set(dictionary.keys())
+        res = list(res - {'.'})
+        res = sorted(res)
+        seq = self.state.randint(0, len(res), size=l)
+        seq = ''.join(list(map(lambda x: res[x], seq)))
+        return seq
 
     def __len__(self):
         return self.pairs.shape[0]

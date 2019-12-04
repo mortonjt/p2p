@@ -136,7 +136,8 @@ def simple_ppitrain(
 
                 # write down summary stats
                 if (now - last_summary_time) > summary_interval:
-                    writer.add_scalar('train_error', err, it)                    # add gradients to histogram
+                    # add gradients to histogram
+                    writer.add_scalar('train_error', err, it)
                     for name, param in finetuned_model.named_parameters():
                         writer.add_histogram('grad/%s' %  name, param.grad, it)
                     last_summary_time = now
