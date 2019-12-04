@@ -25,6 +25,7 @@ class TestTraining(unittest.TestCase):
         # self.checkpoint = '/simons/scratch/jmorton/mgt/checkpoints/uniref50'
         # self.data_dir = '/simons/scratch/jmorton/mgt/data/uniref50'
         # on rusty
+        # TODO: Obtain a 1 layer attention head to train.
         self.checkpoint = '/simons/scratch/jmorton/mgt/checkpoints/uniref50'
         self.data_dir = '/simons/scratch/jmorton/mgt/data/uniref50'
         self.checkpoint = '/mnt/home/jmorton/research/gert/data/full/uniref50/checkpoints'
@@ -35,8 +36,21 @@ class TestTraining(unittest.TestCase):
         # os.remove(self.modelpath)
         pass
 
+    def test_cross_validation(self):
+        # TODO: Test accuracy on test dataset
+        pass
+
+    def test_validate(self):
+        # TODO: Validation accuracy on validation dataset
+        pass
+
+    def test_small_run(self):
+        # TODO: Build test on small attention head
+        # TODO: run on small dataset
+        pass
+
     # @unittest.skip("Run only in the presence of model or data")
-    def test_run(self):
+    def test_large_run(self):
         # # single gpu
         # question : why is accuracy not changing?
         # check -

@@ -3,6 +3,7 @@ import glob
 import math
 from torch.utils.data import Dataset, DataLoader, RandomSampler
 from poplar.util import dictionary, check_random_state
+from poplar.sample import NegativeSampler
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
@@ -115,7 +116,7 @@ class InteractionDataDirectory(Dataset):
 
 class InteractionDataset(Dataset):
 
-    def __init__(self, pairs, num_neg=10, seed=0):
+    def __init__(self, pairs, sampler=None, num_neg=10, seed=0):
         """ Read in pairs of proteins
 
         Parameters
@@ -123,18 +124,24 @@ class InteractionDataset(Dataset):
         pairs: np.array of str
             Pairs of proteins that are experimentally validated to have
             an interaction.
+        sampler : poplar.sample.NegativeSampler
+            Model for drawing negative samples for training
+        num_neg : int
+            Number of negative samples
+        seed : int
+            Random seed
         """
         self.pairs = pairs
         self.num_neg = num_neg
         self.state = check_random_state(seed)
-
+        self.sampler = sampler
 
     def random_peptide_draw(self):
         i = self.state.randint(0, len(self.pairs))
         j = int(np.round(self.state.random()))
         return self.pairs[i, j]
 
-    def random_peptide(self):
+    def random_peptide_uniform(self):
         # randomly generate a length
         # the average peptide has 300 residues
         l = self.state.poisson(300)
@@ -147,6 +154,9 @@ class InteractionDataset(Dataset):
         seq = self.state.randint(0, len(res), size=l)
         seq = ''.join(list(map(lambda x: res[x], seq)))
         return seq
+
+    def random_peptides(self):
+        return self.sampler.draw(1)
 
     def __len__(self):
         return self.pairs.shape[0]
@@ -166,7 +176,8 @@ class InteractionDataset(Dataset):
 
         if worker_info is None:  # single-process data loading
             for i in range(end):
-                yield self.__getitem__[i]
+                for _ in range(self.num_neg):
+                    yield self.__getitem__[i]
         else:
             t = (end - start)
             w = float(worker_info.num_workers)
@@ -175,4 +186,5 @@ class InteractionDataset(Dataset):
             iter_start = start + worker_id * per_worker
             iter_end = min(iter_start + per_worker, end)
             for i in range(iter_start, iter_end):
-                yield self.__getitem__[i]
+                for _ in range(self.num_neg):
+                    yield self.__getitem__[i]

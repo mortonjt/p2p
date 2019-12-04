@@ -44,6 +44,17 @@ class TestTransformer(unittest.TestCase):
         exp = np.array(3.0956974, dtype=np.float32)
         self.assertEqual(res, exp)
 
+    def test_forward_batch(self):
+        # TODO: make sure that batched forward pass words
+        pass
+
+    def test_forward_batch_neg(self):
+        # TODO: make sure that batch forward pass with
+        # multiple negative samples works
+        # also make sure that expectations are also
+        # being correctly implemented (as shown in Levy 2014)
+        pass
+
 
 if __name__ == '__main__':
     unittest.main()

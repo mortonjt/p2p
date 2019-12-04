@@ -44,16 +44,22 @@ class TestInteractionDataset(unittest.TestCase):
         seq = intsd.random_peptide_draw()
         self.assertEqual(len(seq), 200)
 
-    def test_random_peptide(self):
+    def test_random_peptide_uniform(self):
         np.random.seed(0)
         intsd = InteractionDataset(self.pairs)
-        seq = intsd.random_peptide()
+        seq = intsd.random_peptide_uniform()
         self.assertGreater(len(seq), 30)
         self.assertLess(len(seq), 1024)
         self.assertTrue(
             set(seq).issubset(set(dictionary.keys()))
         )
         self.assertNotIn('.', seq)
+
+    def test_random_peptide(self):
+        # TODO: test the random_peptide function
+        # to make sure that peptides are sampled
+        # uniformly from the database
+        pass
 
     def test_getitem(self):
         np.random.seed(0)
@@ -102,7 +108,13 @@ class TestInteractionDataset(unittest.TestCase):
         gene, pos, neg = intsd[98]
         self.assertEqual(len(gene), 1024)
 
+    def test_iter(self):
+        # TODO: test the iter function to make sure
+        # negative samples are being drawn
+        pass
+
     def test_parse(self):
+        # TODO: make sure that a validate dataloader is added
         res = parse(self.fasta_file, self.links_file,
                     training_column='Training',
                     batch_size=10, num_workers=1, arm_the_gpu=False)
@@ -110,6 +122,12 @@ class TestInteractionDataset(unittest.TestCase):
         for g, p, n in train:
             assert True
         self.assertEqual(len(res), 2)
+
+    def test_validator(self):
+        # TODO: make sure that a validate dataloader is added
+        # this will take in some negative samples from
+        # http://www.russelllab.org/negatives/
+        pass
 
 
 if __name__ == "__main__":

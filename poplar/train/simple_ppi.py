@@ -16,7 +16,7 @@ from transformers import AdamW, WarmupLinearSchedule
 
 def simple_ppitrain(
         pretrained_model, directory_dataloader,
-        logging_path=None,
+        negative_sampler, logging_path=None,
         emb_dimension=100, max_steps=0,
         learning_rate=5e-5, warmup_steps=1000,
         gradient_accumulation_steps=1,
@@ -30,10 +30,10 @@ def simple_ppitrain(
         Pretrained Roberta model.
     directory_dataloader : InteractionDataDirectory
         Creates dataloaders
-    emb_dimension : int
-        Number of dimensions to train the model.
     logging_path : path
         Path of logging file.
+    emb_dimension : int
+        Number of dimensions to train the model.
     max_steps : int
         Maximum number of steps to run for. Each step corresponds to
         the evaluation of a protein pair. If this is zero, then it'll
@@ -293,11 +293,12 @@ def simple_ppirun(
         fasta_file, links_directory, training_column,
         batch_size, num_workers, device
     )
+    sampler = NegativeSampler(fasta_file)
 
     # train the fine_tuned model parameters
     finetuned_model = simple_ppitrain(
         pretrained_model, interaction_directory,
-        logging_path,
+        sampler, logging_path,
         emb_dimension, max_steps,
         learning_rate, warmup_steps, gradient_accumulation_steps,
         clip_norm, summary_interval, checkpoint_interval,
