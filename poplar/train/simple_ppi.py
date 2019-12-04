@@ -6,8 +6,8 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 from fairseq.models.roberta import RobertaModel
-from poplar.transformer import RobertaConstrastiveHead
-from poplar.dataset import InteractionDataDirectory
+from poplar.model.transformer import RobertaConstrastiveHead
+from poplar.dataset.interactions import InteractionDataDirectory
 from poplar.util import encode, tokenize
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils import clip_grad_norm_

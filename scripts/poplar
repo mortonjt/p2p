@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-from poplar.train import simple_ppirun
 import click
+from poplar.train.simple_ppi import simple_ppirun
 
 
 @click.group()
