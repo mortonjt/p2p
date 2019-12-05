@@ -5,7 +5,7 @@ import pandas as pd
 from Bio import SeqIO
 from poplar.dataset.interactions import (
     InteractionDataset, parse, preprocess,
-    clean, dictionary)
+    clean, dictionary, NegativeSampler)
 
 
 class TestPreprocess(unittest.TestCase):
@@ -21,7 +21,7 @@ class TestPreprocess(unittest.TestCase):
         seqids = list(map(lambda x: x.id, truncseqs))
         seqdict = dict(zip(seqids, truncseqs))
         pairs = preprocess(seqdict, links)
-        self.assertListEqual(list(pairs.shape), [99, 2])
+        self.assertListEqual(list(pairs.shape), [119, 2])
 
 
 class TestInteractionDataset(unittest.TestCase):
@@ -30,10 +30,10 @@ class TestInteractionDataset(unittest.TestCase):
         self.links_file = get_data_path('links.txt')
         self.fasta_file = get_data_path('prots.fa')
 
-        seqs = list(SeqIO.parse(self.fasta_file, format='fasta'))
-        links = pd.read_table(self.links_file, header=None)
+        self.seqs = list(SeqIO.parse(self.fasta_file, format='fasta'))
+        links = pd.read_table(self.links_file, header=None, index_col=0)
 
-        truncseqs = list(map(clean, seqs))
+        truncseqs = list(map(clean, self.seqs))
         seqids = list(map(lambda x: x.id, truncseqs))
         seqdict = dict(zip(seqids, truncseqs))
         self.pairs = preprocess(seqdict, links)
@@ -59,7 +59,13 @@ class TestInteractionDataset(unittest.TestCase):
         # TODO: test the random_peptide function
         # to make sure that peptides are sampled
         # uniformly from the database
-        pass
+        np.random.seed(0)
+        sampler = NegativeSampler(self.seqs)
+        intsd = InteractionDataset(self.pairs, sampler)
+        res = intsd.random_peptide()
+        seqset = list(map(clean, self.seqs))
+        seqset = set(map(lambda x: x.seq, seqset))
+        self.assertIn(res, seqset)
 
     def test_getitem(self):
         np.random.seed(0)

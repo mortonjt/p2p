@@ -3,7 +3,6 @@ import glob
 import math
 from torch.utils.data import Dataset, DataLoader, RandomSampler
 from poplar.util import dictionary, check_random_state
-from poplar.sample import NegativeSampler
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
@@ -68,6 +67,7 @@ def parse(fasta_file, links_file, training_column=2,
     test_pairs = preprocess(seqdict, test_links)
     train_dataset = InteractionDataset(train_pairs)
     test_dataset = InteractionDataset(test_pairs)
+    # sampler
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
                                   shuffle=True, num_workers=num_workers,
                                   drop_last=True, pin_memory=arm_the_gpu)
@@ -78,6 +78,17 @@ def parse(fasta_file, links_file, training_column=2,
                                  num_workers=num_workers,
                                  pin_memory=arm_the_gpu)
     return train_dataloader, test_dataloader
+
+
+class NegativeSampler(object):
+    """ Sampler for negative data """
+    def __init__(self, seqs):
+        self.seqs = seqs
+
+    def draw(self):
+        """ Draw at random. """
+        i = np.random.randint(0, len(self.seqs))
+        return self.seqs[i].seq
 
 
 class InteractionDataDirectory(Dataset):
@@ -155,8 +166,8 @@ class InteractionDataset(Dataset):
         seq = ''.join(list(map(lambda x: res[x], seq)))
         return seq
 
-    def random_peptides(self):
-        return self.sampler.draw(1)
+    def random_peptide(self):
+        return self.sampler.draw()
 
     def __len__(self):
         return self.pairs.shape[0]
