@@ -33,7 +33,7 @@ def preprocess(seqdict, links):
 
 
 def parse(fasta_file, links_file, training_column=2,
-          batch_size=10, num_workers=1, arm_the_gpu=False):
+          batch_size=10, num_neg=10, num_workers=1, arm_the_gpu=False):
     """ Reads in data and creates dataloaders.
 
     Parameters
@@ -65,9 +65,11 @@ def parse(fasta_file, links_file, training_column=2,
     # create pairs
     train_pairs = preprocess(seqdict, train_links)
     test_pairs = preprocess(seqdict, test_links)
-    train_dataset = InteractionDataset(train_pairs)
-    test_dataset = InteractionDataset(test_pairs)
-    # sampler
+
+    sampler = NegativeSampler(seqs)
+    train_dataset = InteractionDataset(train_pairs, sampler, num_neg=num_neg)
+    test_dataset = InteractionDataset(test_pairs, sampler, num_neg=num_neg)
+
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
                                   shuffle=True, num_workers=num_workers,
                                   drop_last=True, pin_memory=arm_the_gpu)
@@ -94,7 +96,7 @@ class NegativeSampler(object):
 class InteractionDataDirectory(Dataset):
 
     def __init__(self, fasta_file, links_directory,
-                 training_column=2,
+                 training_column=2, num_neg=5,
                  batch_size=10, num_workers=1, arm_the_gpu=False):
         print('links_directory', links_directory)
         self.fasta_file = fasta_file
@@ -112,7 +114,8 @@ class InteractionDataDirectory(Dataset):
         t = 0
         for fname in self.filenames:
             res = parse(self.fasta_file, fname, self.training_column,
-                        self.batch_size, self.num_workers, self.arm_the_gpu)
+                        self.batch_size, num_neg, self.num_workers,
+                        self.arm_the_gpu)
             # number of sequences in a dataset = (num batch) x (batch size)
             t += len(res[0]) * res[0].batch_size
         return t
@@ -120,7 +123,8 @@ class InteractionDataDirectory(Dataset):
     def __iter__(self):
         return (
             parse(self.fasta_file, fname, self.training_column,
-                  self.batch_size, self.num_workers, self.arm_the_gpu)
+                  self.batch_size, num_neg, self.num_workers,
+                  self.arm_the_gpu)
             for fname in self.filenames
         )
 
@@ -146,6 +150,8 @@ class InteractionDataset(Dataset):
         self.num_neg = num_neg
         self.state = check_random_state(seed)
         self.sampler = sampler
+        if sampler is None:
+            self.num_neg = 1
 
     def random_peptide_draw(self):
         i = self.state.randint(0, len(self.pairs))
@@ -167,6 +173,9 @@ class InteractionDataset(Dataset):
         return seq
 
     def random_peptide(self):
+        if self.sampler is None:
+            raise ("No negative sampler specified")
+
         return self.sampler.draw()
 
     def __len__(self):
@@ -184,6 +193,7 @@ class InteractionDataset(Dataset):
         w = float(worker_info.num_workers)
         start = 0
         end = len(self.links)
+
 
         if worker_info is None:  # single-process data loading
             for i in range(end):

@@ -56,7 +56,7 @@ class TestInteractionDataset(unittest.TestCase):
         self.assertNotIn('.', seq)
 
     def test_random_peptide(self):
-        # TODO: test the random_peptide function
+        # Test the random_peptide function
         # to make sure that peptides are sampled
         # uniformly from the database
         np.random.seed(0)
@@ -69,7 +69,8 @@ class TestInteractionDataset(unittest.TestCase):
 
     def test_getitem(self):
         np.random.seed(0)
-        intsd = InteractionDataset(self.pairs)
+        sampler = NegativeSampler(self.seqs)
+        intsd = InteractionDataset(self.pairs, sampler)
         gene, pos, neg = intsd[0]
 
         exp_gene = list(
@@ -78,7 +79,6 @@ class TestInteractionDataset(unittest.TestCase):
             'AEAEQARVSVRNIRRDALAQLKDLQKEKEISEDEERRAGDDVQKLTDKFIGEIEKALEA'
             'KEADLMAV'
         )
-
         exp_pos = list(
             'MMRSHYCGQLNESLDGQEVTLCGWVHRRRDHGGVIFLDVRDREGLAQVVFDPDRAETFA'
             'KADRVRSEFVVKITGKVRLRPEGARNPNMASGSIEVLGYELEVLNQAETPPFPLDEYSD'
@@ -92,18 +92,12 @@ class TestInteractionDataset(unittest.TestCase):
             'LAFGLDRLVMLMTGASSIREVIAFPKTQSAGDVMTQAPGSVDGKALRELHIRLREQPKAE'
         )
         exp_neg = list(
-            'DDHJTVSEXGYYMBGHXOYRFZNIJUTQTFPPASDYRTTTOHABJZAKUXDLSXCAAEV'
-            'FGIURPEJKYBBHJZDGXLOSAODVMZKULEGEPUDMEUIOPUDXPNVVQRFJDAFARS'
-            'ECQDCKNQHVJAKSLXCZCDDSODURSOJBEKWLILCTQAWAGTOKTYINYCDCLNQII'
-            'TICYUDMOAEDNLWNZNLYQYVOZQZWVTBIAEZGVNHYYPJSIWPLGPZBWMYYDSPD'
-            'KMGDWFXLALIUKWLFPICTZXVTOUVDDHJJJXDOSMDJKNHHVBMCCYBFIEALCFV'
-            'QIBRQDY'
+            'MTTSDLPAFWTVIPAAGVGSRMRADRPKQYLDLAGRTVIERTLDCFLEHPMLRGLVVCL'
+            'AEDDPYWPGLDCAASRHVQRAAGGVERADSVLSGLLRLLELGAQADDWVLVHDAARPNL'
+            'TRGDLDRLLEELAEDPVGGLLAVPARDTLKRSDRDGRVSETIDRSVVWLAYTPQMFRLG'
+            'ALHRALADALVAGVAITDEASAMEWAGYAPKLVEGRADNLKITTPEDLLRLQRSFPH'
         )
 
-        # 'MDLFADAPLTLPDADLRYLPHWLDAPLASAWLLRLEQETPWEQPILRIHGEEHPTPRLV'
-        # 'AWYGDPDAAYRYSGQVHRPLPWTALLGEIRERVEREVGQRVNGVLLNYYRDGQDSMGWH'
-        # 'SDDEPELRRDPLVASLSLGGSRRFDLRRKGQTRIAHSLELTHGSLLVMRGATQHHWQHQ'
-        # 'VAKTRRSCMPRLNLTFRLVYPQP'
         self.assertListEqual(list(gene), exp_gene)
         self.assertListEqual(list(pos), exp_pos)
         self.assertListEqual(list(neg), exp_neg)
@@ -115,9 +109,14 @@ class TestInteractionDataset(unittest.TestCase):
         self.assertEqual(len(gene), 1024)
 
     def test_iter(self):
-        # TODO: test the iter function to make sure
+        # Test the iter function to make sure
         # negative samples are being drawn
-        pass
+        np.random.seed(0)
+        sampler = NegativeSampler(self.seqs)
+        intsd = InteractionDataset(self.pairs, sampler)
+        res = [r for r in intsd]
+        self.assertEqual(len(res), self.pairs.shape[0] * intsd.num_neg)
+
 
     def test_parse(self):
         # TODO: make sure that a validate dataloader is added
