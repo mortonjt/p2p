@@ -21,7 +21,7 @@ class TestPreprocess(unittest.TestCase):
         seqids = list(map(lambda x: x.id, truncseqs))
         seqdict = dict(zip(seqids, truncseqs))
         pairs = preprocess(seqdict, links)
-        self.assertListEqual(list(pairs.shape), [119, 2])
+        self.assertListEqual(list(pairs.shape), [103, 2])
 
 
 class TestInteractionDataset(unittest.TestCase):
@@ -31,29 +31,12 @@ class TestInteractionDataset(unittest.TestCase):
         self.fasta_file = get_data_path('prots.fa')
 
         self.seqs = list(SeqIO.parse(self.fasta_file, format='fasta'))
-        links = pd.read_table(self.links_file, header=None, index_col=0)
+        links = pd.read_table(self.links_file, header=None)
 
         truncseqs = list(map(clean, self.seqs))
         seqids = list(map(lambda x: x.id, truncseqs))
         seqdict = dict(zip(seqids, truncseqs))
         self.pairs = preprocess(seqdict, links)
-
-    def test_random_peptide_draw(self):
-        np.random.seed(0)
-        intsd = InteractionDataset(self.pairs)
-        seq = intsd.random_peptide_draw()
-        self.assertEqual(len(seq), 200)
-
-    def test_random_peptide_uniform(self):
-        np.random.seed(0)
-        intsd = InteractionDataset(self.pairs)
-        seq = intsd.random_peptide_uniform()
-        self.assertGreater(len(seq), 30)
-        self.assertLess(len(seq), 1024)
-        self.assertTrue(
-            set(seq).issubset(set(dictionary.keys()))
-        )
-        self.assertNotIn('.', seq)
 
     def test_random_peptide(self):
         # Test the random_peptide function
@@ -68,10 +51,11 @@ class TestInteractionDataset(unittest.TestCase):
         self.assertIn(res, seqset)
 
     def test_getitem(self):
-        np.random.seed(0)
+        np.random.seed(1)
         sampler = NegativeSampler(self.seqs)
         intsd = InteractionDataset(self.pairs, sampler)
         gene, pos, neg = intsd[0]
+
 
         exp_gene = list(
             'MINEIKKEAQERMGKTLEALGHAFAKIRTGRAHPSILDSVMVSYYGADTPLRQVANVTV'
@@ -92,21 +76,16 @@ class TestInteractionDataset(unittest.TestCase):
             'LAFGLDRLVMLMTGASSIREVIAFPKTQSAGDVMTQAPGSVDGKALRELHIRLREQPKAE'
         )
         exp_neg = list(
-            'MTTSDLPAFWTVIPAAGVGSRMRADRPKQYLDLAGRTVIERTLDCFLEHPMLRGLVVCL'
-            'AEDDPYWPGLDCAASRHVQRAAGGVERADSVLSGLLRLLELGAQADDWVLVHDAARPNL'
-            'TRGDLDRLLEELAEDPVGGLLAVPARDTLKRSDRDGRVSETIDRSVVWLAYTPQMFRLG'
-            'ALHRALADALVAGVAITDEASAMEWAGYAPKLVEGRADNLKITTPEDLLRLQRSFPH'
+            'MILELDCGNSLIKWRVIEGAARSVAGGLAESDDALVEQLTSQQALPVRACRLVSVRSEQ'
+            'ETSQLVARLEQLFPVSALVASSGKQLAGVRNGYLDYQRLGLDRWLALVAAHHLAKKACL'
+            'VIDLGTAVTSDLVAADGVHLGGYICPGMTLMRSQLRTHTRRIRYDDAEARRALASLQPG'
+            'QATAEAVERGCLLMLRGFVREQYAMACELLGPDCEIFLTGGDAELVRDELAGARIMPDL'
+            'VFVGLALACPIE'
         )
 
         self.assertListEqual(list(gene), exp_gene)
         self.assertListEqual(list(pos), exp_pos)
         self.assertListEqual(list(neg), exp_neg)
-
-    def test_getitem_truncate(self):
-        np.random.seed(0)
-        intsd = InteractionDataset(self.pairs)
-        gene, pos, neg = intsd[98]
-        self.assertEqual(len(gene), 1024)
 
     def test_iter(self):
         # Test the iter function to make sure
@@ -117,34 +96,77 @@ class TestInteractionDataset(unittest.TestCase):
         res = [r for r in intsd]
         self.assertEqual(len(res), self.pairs.shape[0] * intsd.num_neg)
 
-    def test_parse(self):
-        # Make sure that a validate dataloader is added
-        batch_size = 1
-        res = parse(self.fasta_file, self.links_file,
-                    training_column='Training',
-                    batch_size=batch_size,
-                    num_workers=1, arm_the_gpu=False)
-        self.assertEqual(len(res), 3)
+    # def test_parse(self):
+    #     # Make sure that a validate dataloader is added
+    #     batch_size = 1
+    #     res = parse(self.fasta_file, self.links_file,
+    #                 training_column='Training',
+    #                 batch_size=batch_size,
+    #                 num_workers=1, arm_the_gpu=False)
+    #     self.assertEqual(len(res), 3)
 
-        train, test, valid = res
+    #     train, test, valid = res
 
-        i = 0
-        for g, p, n in train:
-            i+= 1
-        self.assertEqual(len(train), 82)
+    #     i = 0
+    #     for g, p, n in train:
+    #         i+= 1
+    #     self.assertEqual(len(train), 82)
 
-        i = 0
-        for g, p, n in test:
-            i+= 1
-        self.assertEqual(len(test), 12)
+    #     i = 0
+    #     for g, p, n in test:
+    #         i+= 1
+    #     self.assertEqual(len(test), 12)
 
-        # Make sure that a validate dataloader is added
-        # this will take in some negative samples from
-        # http://www.russelllab.org/negatives/
-        i = 0
-        for g, p, n in valid:
-            i+= 1
-        self.assertEqual(len(valid), 25)
+    #     # Make sure that a validate dataloader is added
+    #     # this will take in some negative samples from
+    #     # http://www.russelllab.org/negatives/
+    #     i = 0
+    #     for g, p, n in valid:
+    #         i+= 1
+    #     self.assertEqual(len(valid), 25)
+
+
+class TestValidationDataset(unittest.TestCase):
+
+    def setUp(self):
+        self.links_file = get_data_path('links.txt')
+        self.fasta_file = get_data_path('prots.fa')
+
+        self.seqs = list(SeqIO.parse(self.fasta_file, format='fasta'))
+        links = pd.read_table(self.links_file, header=None, index_col=0)
+
+        truncseqs = list(map(clean, self.seqs))
+        seqids = list(map(lambda x: x.id, truncseqs))
+        seqdict = dict(zip(seqids, truncseqs))
+        negative = (links[3] == 'Negatome')
+        pos_links = links.loc[~negative]
+        neg_links = links.loc[negative]
+        self.pos_pairs = preprocess(seqdict, pos_links)
+        self.neg_pairs = preprocess(seqdict, neg_links)
+
+    def test_random_peptide(self):
+        pass
+
+    def test_getitem(self):
+        np.random.seed(0)
+        sampler = NegativeSampler(self.seqs)
+        intsd = ValidationDataset(self.pairs, sampler)
+        gene, pos, neg1, neg2, rnd = intsd[0]
+
+        print(gene)
+        print(pos)
+        print(neg1)
+        print(neg2)
+        print(rnd)
+
+    def test_iter(self):
+        # Test the iter function to make sure
+        # negative samples are being drawn
+        np.random.seed(0)
+        sampler = NegativeSampler(self.seqs)
+        intsd = ValidationDataset(self.pairs, sampler)
+        res = [r for r in intsd]
+        self.assertEqual(len(res), self.pairs.shape[0] * intsd.num_neg)
 
 
 if __name__ == "__main__":

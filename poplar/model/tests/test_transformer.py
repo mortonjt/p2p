@@ -45,15 +45,33 @@ class TestTransformer(unittest.TestCase):
         self.assertEqual(res, exp)
 
     def test_forward_batch(self):
-        # TODO: make sure that batched forward pass words
-        pass
+        batch = 5
+
+        inp1 = torch.ones(batch, self.dim) * 0.001
+        inp2 = torch.ones(batch, self.dim) * 0.001
+        inp3 = -0.001 * torch.ones(batch, self.dim)
+
+        out = self.model.forward(inp1, inp2, inp3)
+        res = out.detach().numpy()
+        exp = np.array(3.0956974 * batch, dtype=np.float32)
+        self.assertEqual(res, exp)
 
     def test_forward_batch_neg(self):
         # TODO: make sure that batch forward pass with
         # multiple negative samples works
         # also make sure that expectations are also
         # being correctly implemented (as shown in Levy 2014)
-        pass
+        batch = 5
+        num_neg = 3
+
+        inp1 = torch.ones(batch * num_neg, self.dim) * 0.001
+        inp2 = torch.ones(batch * num_neg, self.dim) * 0.001
+        inp3 = -0.001 * torch.ones(batch * num_neg, self.dim)
+
+        out = self.model.forward(inp1, inp2, inp3)
+        res = out.detach().numpy()
+        exp = np.array(3.0956974 * batch * num_neg, dtype=np.float32)
+        self.assertAlmostEqual(res, exp, places=4)
 
 
 if __name__ == '__main__':

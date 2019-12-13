@@ -25,8 +25,8 @@ def preprocess(seqdict, links):
     # 0 = protein 1
     # 1 = protein 2
     pairs = links.apply(
-        lambda x: (np.array(seqdict[x[1]].seq),
-                   np.array(seqdict[x[2]].seq)),
+        lambda x: (np.array(seqdict[x[0]].seq),
+                   np.array(seqdict[x[1]].seq)),
         axis=1)
     pairs = np.array(list(pairs.values))
     return pairs
@@ -52,13 +52,27 @@ def parse(fasta_file, links_file, training_column=2,
         Number of workers for training (1 worker for testing).
     arm_the_gpu : bool
         Use a gpu or not.
+
+    Note
+    ----
+    This assumes that the training file is in the tsv format with
+    the following columns.
+
+    1. protein 1 id
+    2. protein 2 id
+    3. database source
+    4. taxonomy
+    5. train/test/validate
+
+    For validation, it is assumed that the first protein id comes from
+    the pathogen and the second protein id comes from the host.
     """
     seqs = list(SeqIO.parse(fasta_file, format='fasta'))
     links = pd.read_table(links_file, header=None, index_col=0)
-    train_links = links.loc[links[3] == 'Train']
-    test_links = links.loc[links[3] == 'Test']
-    valid = np.logical_or(links[3] == 'Validate',
-                          links[3] == 'Negative')
+    train_links = links.loc[links[4] == 'Train']
+    test_links = links.loc[links[4] == 'Test']
+    valid = np.logical_or(links[4] == 'Validate',
+                          links[4] == 'Negative')
     valid_links = links.loc[valid]
 
     # obtain sequences
@@ -85,6 +99,10 @@ def parse(fasta_file, links_file, training_column=2,
                                  num_workers=num_workers,
                                  pin_memory=arm_the_gpu)
 
+    # There are going to be 3 different validation dataloaders, namely for
+    # 1. negative examples from negatome
+    # 2. HPIDB (host taxon ranking)
+    # 3. bARTTs (host taxon ranking)
     valid_batch_size = max(batch_size, 1)
     valid_dataloader = DataLoader(valid_dataset, batch_size=valid_batch_size,
                                   drop_last=False, shuffle=False,
@@ -142,7 +160,7 @@ class InteractionDataDirectory(Dataset):
 
 
 class InteractionDataset(Dataset):
-
+    """ Dataset for training and testing. """
     def __init__(self, pairs, sampler=None, num_neg=10, seed=0):
         """ Read in pairs of proteins
 
@@ -165,25 +183,6 @@ class InteractionDataset(Dataset):
         if sampler is None:
             self.num_neg = 1
 
-    def random_peptide_draw(self):
-        i = self.state.randint(0, len(self.pairs))
-        j = int(np.round(self.state.random()))
-        return self.pairs[i, j]
-
-    def random_peptide_uniform(self):
-        # randomly generate a length
-        # the average peptide has 300 residues
-        l = self.state.poisson(300)
-        l = max(30, l)
-        l = min(1024, l)
-
-        res = set(dictionary.keys())
-        res = list(res - {'.'})
-        res = sorted(res)
-        seq = self.state.randint(0, len(res), size=l)
-        seq = ''.join(list(map(lambda x: res[x], seq)))
-        return seq
-
     def random_peptide(self):
         if self.sampler is None:
             raise ("No negative sampler specified")
@@ -200,6 +199,97 @@ class InteractionDataset(Dataset):
         return ''.join(gene), ''.join(pos), ''.join(neg)
 
     def __iter__(self):
+        worker_info = torch.utils.data.get_worker_info()
+        start = 0
+        end = len(self.pairs)
+
+        if worker_info is None:  # single-process data loading
+            for i in range(end):
+                for _ in range(self.num_neg):
+                    yield self.__getitem__(i)
+        else:
+            worker_id = worker_info.id
+            w = float(worker_info.num_workers)
+
+            t = (end - start)
+            w = float(worker_info.num_workers)
+            per_worker = int(math.ceil(t / w))
+            worker_id = worker_info.id
+            iter_start = start + worker_id * per_worker
+            iter_end = min(iter_start + per_worker, end)
+            for i in range(iter_start, iter_end):
+                for _ in range(self.num_neg):
+                    yield self.__getitem__(i)
+
+
+class ValidationDataset(InteractionDataset):
+    """ Dataset for validation. """
+
+    def __init__(self, pos_pairs, neg_pairs, sampler=None, num_neg=10, seed=0):
+        """ Read in pairs of proteins
+
+        Parameters
+        ----------
+        pairs: np.array of str
+            Pairs of proteins that are experimentally validated to have
+            an interaction.
+        sampler : poplar.sample.NegativeSampler
+            Model for drawing negative samples for training
+        num_neg : int
+            Number of negative samples
+        seed : int
+            Random seed
+        """
+        super().__init__(pos_pairs, sampler, num_neg, seed)
+        self.neg_pairs = neg_pairs
+
+    def __getitem__(self, i):
+        """ Retrieves protein pairs
+
+        Parameters
+        ----------
+        gene : str
+            Protein of interest
+        pos : str
+            Positive interacting protein
+        neg1 : str
+            Random negative protein
+        neg2 : str
+            Random protein known not to interact with neg1.
+        rnd : str
+            Random protein
+        """
+        gene = self.pairs[i, 0]
+        pos = self.pairs[i, 1]
+        rnd = self.random_peptide()
+
+        j = np.random.randint(0, len(self.neg_pairs))
+
+        neg1 = self.neg_pairs[j, 0]
+        neg2 = self.neg_pairs[j, 1]
+
+        return (
+            ''.join(gene), ''.join(pos),
+            ''.join(neg1), ''.join(neg2),
+            ''.join(rnd)
+        )
+
+    def __iter__(self):
+        """ Retrieves an iterable of protein pairs
+
+        Parameters
+        ----------
+        gene : str
+            Protein of interest
+        pos : str
+            Positive interacting protein
+        neg1 : str
+            Random negative protein
+        neg2 : str
+            Random protein known not to interact with neg1.
+        rnd : str
+            Random protein
+        """
         worker_info = torch.utils.data.get_worker_info()
         start = 0
         end = len(self.pairs)

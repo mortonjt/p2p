@@ -63,7 +63,8 @@ class RobertaConstrastiveHead(nn.Module):
         else:
             losses += score
         neg_emb_v = self.v_embeddings(neg_v)
-        neg_score = torch.bmm(neg_emb_v.unsqueeze(1), emb_u.unsqueeze(2)).squeeze()
+        neg_score = torch.bmm(neg_emb_v.unsqueeze(1),
+                              emb_u.unsqueeze(2)).squeeze()
         neg_score = F.logsigmoid(-1 * neg_score)
         if neg_score.dim() >= 1:
             losses += sum(neg_score)
