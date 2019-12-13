@@ -96,35 +96,6 @@ class TestInteractionDataset(unittest.TestCase):
         res = [r for r in intsd]
         self.assertEqual(len(res), self.pairs.shape[0] * intsd.num_neg)
 
-    # def test_parse(self):
-    #     # Make sure that a validate dataloader is added
-    #     batch_size = 1
-    #     res = parse(self.fasta_file, self.links_file,
-    #                 training_column='Training',
-    #                 batch_size=batch_size,
-    #                 num_workers=1, arm_the_gpu=False)
-    #     self.assertEqual(len(res), 3)
-
-    #     train, test, valid = res
-
-    #     i = 0
-    #     for g, p, n in train:
-    #         i+= 1
-    #     self.assertEqual(len(train), 82)
-
-    #     i = 0
-    #     for g, p, n in test:
-    #         i+= 1
-    #     self.assertEqual(len(test), 12)
-
-    #     # Make sure that a validate dataloader is added
-    #     # this will take in some negative samples from
-    #     # http://www.russelllab.org/negatives/
-    #     i = 0
-    #     for g, p, n in valid:
-    #         i+= 1
-    #     self.assertEqual(len(valid), 25)
-
 
 class TestValidationDataset(unittest.TestCase):
 
@@ -209,6 +180,41 @@ class TestValidationDataset(unittest.TestCase):
         intsd = ValidationDataset(self.pos_pairs, self.neg_pairs, sampler)
         res = [r for r in intsd]
         self.assertEqual(len(res), self.pos_pairs.shape[0] * intsd.num_neg)
+
+
+class TestParse(unittest.TestCase):
+    def __init__(self):
+        pass
+
+    def test_parse(self):
+        # Make sure that a validate dataloader is added
+        batch_size = 1
+        res = parse(self.fasta_file, self.links_file,
+                    training_column='Training',
+                    batch_size=batch_size,
+                    num_workers=1, arm_the_gpu=False)
+        self.assertEqual(len(res), 3)
+
+        train, test, valid = res
+
+        i = 0
+        for g, p, n in train:
+            i+= 1
+        self.assertEqual(len(train), 82)
+
+        i = 0
+        for g, p, n in test:
+            i+= 1
+        self.assertEqual(len(test), 12)
+
+        # Make sure that a validate dataloader is added
+        # this will take in some negative samples from
+        # http://www.russelllab.org/negatives/
+        i = 0
+        for g, p, n in valid:
+            i+= 1
+        self.assertEqual(len(valid), 25)
+
 
 
 if __name__ == "__main__":

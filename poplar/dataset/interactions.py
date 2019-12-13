@@ -81,7 +81,18 @@ def parse(fasta_file, links_file, training_column=2,
     seqdict = dict(zip(seqids, truncseqs))
     # create pairs
     train_pairs = preprocess(seqdict, train_links)
-    test_pairs = preprocess(seqdict, test_links)
+
+    test_positive = (test_links[2] != 'Negatome')
+    test_negative = (test_links[2] == 'Negatome')
+    test_positive = preprocess(seqdict, test_positive)
+    test_negative = preprocess(seqdict, test_negative)
+
+    # TODO: get this to work with bARTTs and HPIDB
+    test_positive = (test_links[2] != 'Negatome')
+    test_negative = (test_links[2] == 'Negatome')
+    test_positive = preprocess(seqdict, test_positive)
+    test_negative = preprocess(seqdict, test_negative)
+
     valid_pairs = preprocess(seqdict, valid_links)
 
     sampler = NegativeSampler(seqs)
