@@ -8,6 +8,46 @@ def poplar():
     pass
 
 @poplar.command()
+@click.option('--training-links',
+              help='Comma separated list of training link data.')
+@click.option('--testing-links',
+              help='Comma separated list of testing link data.')
+@click.option('--validation-links',
+              help='Comma separated list of validation link data.')
+@click.option('--output-directory', default='output_directory',
+              help='Output directory name.')
+@click.option('--split-size', default=100000,
+              help='Number of lines per training file.')
+def preprocess(training_links, testing_links, validation_links,
+               output_directory, split_size):
+    # TODO!
+
+    ## Training data
+    # Combines training links files together
+
+    # Shuffles training links files via bash shuf
+
+    # Fragments training links files via split
+
+    # Saves training files to output directory
+
+    ## Testing data
+    # Combines testing links files together
+
+    # Sorts testing files by (1) taxonomy and (2) protein
+
+    # Saves training files to output directory
+
+    ## Validation data
+    # Combines testing links files together
+
+    # Sorts testing files by (1) taxonomy and (2) protein
+
+    # Saves training files to output directory
+    pass
+
+
+@poplar.command()
 @click.option('--fasta-file',
               help='Input sequences in fasta format.')
 @click.option('--links-directory',
@@ -76,6 +116,7 @@ def simple_ppi(fasta_file, links_directory,
         summary_interval=summary_interval,
         checkpoint_interval=checkpoint_interval,
         device=device_name)
+
 
 if __name__ == "__main__":
     poplar()

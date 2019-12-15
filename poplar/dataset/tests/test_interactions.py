@@ -5,7 +5,8 @@ import pandas as pd
 from Bio import SeqIO
 from poplar.dataset.interactions import (
     InteractionDataset, ValidationDataset,
-    parse, preprocess, clean, dictionary,
+    parse_combined_interactions, preprocess,
+    clean, dictionary,
     NegativeSampler)
 
 
@@ -182,7 +183,7 @@ class TestValidationDataset(unittest.TestCase):
         self.assertEqual(len(res), self.pos_pairs.shape[0] * intsd.num_neg)
 
 
-class TestParse(unittest.TestCase):
+class TestParseCombinedInteractions(unittest.TestCase):
     def __init__(self):
         pass
 
