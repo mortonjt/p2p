@@ -97,7 +97,3 @@
 287.DR97_4286	287.DR97_5343	STRING	287	Train
 287.DR97_4286	287.DR97_970	STRING	287	Train
 waytoolong	287.DR97_4286	STRING	287	Train
-negative1	negative2	Negatome	300	Test
-negative3	negative4	Negatome	300	Test
-negative4	negative5	Negatome	300	Validate
-negative6	negative7	Negatome	300	Validate

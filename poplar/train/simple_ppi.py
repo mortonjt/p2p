@@ -55,6 +55,10 @@ def simple_ppitrain(
     Returns
     -------
     finetuned_model : poplar.transformer.RobertaConstrastiveHead
+
+    TODO
+    ----
+    Enable per test dataset dataloaders
     """
     last_summary_time = time.time()
     last_checkpoint_time = time.time()
@@ -224,7 +228,7 @@ def simple_ppitrain(
 
 
 def simple_ppirun(
-        fasta_file, links_directory,
+        fasta_file, training_directory, test_datasets,
         checkpoint_path, data_dir, model_path, logging_path,
         training_column='Training',
         emb_dimension=100, num_neg=10,
@@ -239,9 +243,11 @@ def simple_ppirun(
     ----------
     fasta_file : filepath
         Fasta file of sequences of interest.
-    links_directory : filepath
+    training_directory : filepath
         Directory of links files. Each link file contains
         a table of tab delimited interactions
+    test_datasets : list of filepaths
+        List of datasets to use for testing.
     emb_dimensions : int
         Number of embedding dimensions.
     num_neg : int
@@ -269,6 +275,10 @@ def simple_ppirun(
         Number of seconds for a summary update.
     device : str
         Name of device to run on.
+
+    TODO
+    ----
+    Enable per test dataset dataloaders
     """
     # An example of how to load your own roberta model
     # roberta_checkpoint_path = 'checkpoints/uniref50'

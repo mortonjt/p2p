@@ -34,64 +34,9 @@ def preprocess(seqdict, links):
     return pairs
 
 
-def construct_dataloader(
-        seqdict, links,
-        training_column=4,
-        database_name,
-        batch_size=10, num_neg=10, num_workers=1,
-        arm_the_gpu=False):
-    """ Reads in data and creates dataloaders for interactions.
-
-    Parameters
-    ----------
-    seqdict : dict of Bio.Sequence objects
-        Dictionary of protein sequences, with sequence id lookup keys.
-    link : pd.DataFrame
-        Dataframe specifying training data.
-    training_column : int
-        Specifies which samples are for training and testing,
-        in the links file. These must be labeled as
-        'Train', 'Test' or 'Validate'.
-    database_name : str
-        Name of database.
-    batch_size : int
-        Number of protein triples to analyze in a given batch.
-    num_workers : int
-        Number of workers for training (1 worker for testing).
-    arm_the_gpu : bool
-        Use a gpu or not.
-
-    Returns
-    -------
-    Dictionary of dataloaders
-
-    TODO
-    ----
-    Create unittests for this function
-    """
-    train = links.loc[links[training_column] == 'Train']
-    test = links.loc[links[training_column] == 'Test']
-    valid = links.loc[links[training_column] == 'Validate']
-    sampler = NegativeSampler(seqs)
-
-    res = {}
-    for data in [train, test, valid]:
-    if data.shape[0] > 0:
-        pairs = preprocess(seqdict, data)
-        intdata = InteractionDataset(
-            pairs, sampler, num_neg=num_neg)
-        res[f'{database_name}_Train'] = DataLoader(
-            intdata, batch_size=batch_size,
-            shuffle=True, num_workers=num_workers,
-            drop_last=True, pin_memory=arm_the_gpu)
-    return res
-
-def parse_combined_interactions(
-        fasta_file, links_file, training_column=2,
-        batch_size=10, num_neg=10, num_workers=1,
-        arm_the_gpu=False):
-    """ Reads in data and creates dataloaders for interactions.
-
+def parse(fasta_file, links_file, training_column=4,
+          batch_size=10, num_neg=10, num_workers=1, arm_the_gpu=False):
+    """ Reads in data and creates dataloaders.
     Parameters
     ----------
     fasta_file : filepath
@@ -108,77 +53,42 @@ def parse_combined_interactions(
         Number of workers for training (1 worker for testing).
     arm_the_gpu : bool
         Use a gpu or not.
-
-    Notes
-    -----
-    This assumes that the training file is in the tsv format with
-    the following columns.
-
-    0. protein 1 id
-    1. protein 2 id
-    2. database source
-    3. taxonomy
-    4. train/test/validate
-    5. positive / negative (TODO!)
-
-    For validation, it is assumed that the first protein id comes from
-    the pathogen and the second protein id comes from the host.
-
-    Questions
-    ---------
-    Would it be better to force the user to input a single file
-    with all of the columns labeled, or have the user input
-    separate files?
-
-    Note: we currently force the user to input a directory
-    containing multiple files (with the columns labeled).
-    The reason for this is because pytorch dataloaders cannot
-    handle datasets that are too large. The potential disadvantage is
-    that it could get confusing from a users point of view.
-    Furthermore, this complicates how the testing/validation should be done.
-    The test/validation dataset should be sorted by (1) taxonomy,
-    then by (2) protein1.
-
-    Idea: would it be worthwhile to have the user specify a manifest
-    for the input files? PROBABLY NOT!
-
-    Would it be beneficial to make preprocessing scripts available?
-    DEFINITE YES!
-
-    Idea
-    ----
-    1. Make scripts for converting string / hpidb to poplar format public.
-    2. Make a preprocessing script to combine datasets together.
-       This will (1) fragment the training data into multiple pieces and
-       (2) merge testing data and sort by taxonomy + protein1 and
-       (3) merge validation data and sort by taxonomy + protein1
-
-    TODO
-    ----
-    Allow for the user to specify if the data is positive or negative.
     """
     seqs = list(SeqIO.parse(fasta_file, format='fasta'))
+    links = pd.read_table(links_file, header=None, sep='\s+')
+
+    train_links = links.loc[links[training_column] == 'Train']
+    test_links = links.loc[links[training_column] == 'Test']
+    valid_links = links.loc[links[training_column] == 'Validate']
+
     # obtain sequences
     truncseqs = list(map(clean, seqs))
     seqids = list(map(lambda x: x.id, truncseqs))
     seqdict = dict(zip(seqids, truncseqs))
+    # create pairs
+    train_pairs = preprocess(seqdict, train_links)
+    test_pairs = preprocess(seqdict, test_links)
+    valid_pairs = preprocess(seqdict, valid_links)
 
-    links = pd.read_table(links_file, header=None, index_col=0)
-    dbnames = list(links[2].values_counts().index)
-    db_loaders = {}
-    for db in dbnames:
-        db_links = links.loc[links[2] == db]
-        db_loader = construct_dataloader(
-            seqdict, links,
-            training_column=training_column,
-            database_name=db,
-            batch_size=batch_size,
-            num_neg=num_neg,
-            num_workers=num_workers,
-            arm_the_gpu=False)
-        # merge dataloaders
-        db_loaders = {**db_loaders, **db_loader}
-    return db_loaders
+    sampler = NegativeSampler(seqs)
+    train_dataloader, test_dataloader, valid_dataloader = None, None, None
+    if len(train_pairs) > 0:
+        train_dataset = InteractionDataset(train_pairs, sampler, num_neg=num_neg)
+        train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
+                                      shuffle=True, num_workers=num_workers,
+                                      drop_last=True, pin_memory=arm_the_gpu)
+    if len(test_pairs) > 0:
+        test_dataset = InteractionDataset(test_pairs, sampler, num_neg=num_neg)
+        test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
+                                      shuffle=True, num_workers=num_workers,
+                                      drop_last=True, pin_memory=arm_the_gpu)
+    if len(valid_pairs) > 0:
+        valid_dataset = InteractionDataset(valid_pairs, sampler, num_neg=num_neg)
+        valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size,
+                                      shuffle=True, num_workers=num_workers,
+                                      drop_last=True, pin_memory=arm_the_gpu)
+
+    return train_dataloader, test_dataloader, valid_dataloader
 
 
 class NegativeSampler(object):

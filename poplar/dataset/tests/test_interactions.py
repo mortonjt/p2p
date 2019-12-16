@@ -5,7 +5,7 @@ import pandas as pd
 from Bio import SeqIO
 from poplar.dataset.interactions import (
     InteractionDataset, ValidationDataset,
-    parse_combined_interactions, preprocess,
+    parse, preprocess,
     clean, dictionary,
     NegativeSampler)
 
@@ -23,7 +23,7 @@ class TestPreprocess(unittest.TestCase):
         seqids = list(map(lambda x: x.id, truncseqs))
         seqdict = dict(zip(seqids, truncseqs))
         pairs = preprocess(seqdict, links)
-        self.assertListEqual(list(pairs.shape), [103, 2])
+        self.assertListEqual(list(pairs.shape), [99, 2])
 
 
 class TestInteractionDataset(unittest.TestCase):
@@ -183,15 +183,16 @@ class TestValidationDataset(unittest.TestCase):
         self.assertEqual(len(res), self.pos_pairs.shape[0] * intsd.num_neg)
 
 
-class TestParseCombinedInteractions(unittest.TestCase):
-    def __init__(self):
-        pass
+class TestParse(unittest.TestCase):
 
-    def test_parse(self):
+    def test_parse_links(self):
         # Make sure that a validate dataloader is added
         batch_size = 1
+        self.links_file = get_data_path('links.txt')
+        self.fasta_file = get_data_path('prots.fa')
+
         res = parse(self.fasta_file, self.links_file,
-                    training_column='Training',
+                    training_column=4,
                     batch_size=batch_size,
                     num_workers=1, arm_the_gpu=False)
         self.assertEqual(len(res), 3)
@@ -209,13 +210,40 @@ class TestParseCombinedInteractions(unittest.TestCase):
         self.assertEqual(len(test), 12)
 
         # Make sure that a validate dataloader is added
-        # this will take in some negative samples from
-        # http://www.russelllab.org/negatives/
         i = 0
         for g, p, n in valid:
             i+= 1
-        self.assertEqual(len(valid), 25)
+        self.assertEqual(len(valid), 5)
 
+    def test_parse_positive(self):
+        batch_size = 1
+        self.links_file = get_data_path('positive.txt')
+        self.fasta_file = get_data_path('prots.fa')
+
+        res = parse(self.fasta_file, self.links_file,
+                    training_column=4,
+                    batch_size=batch_size,
+                    num_workers=1, arm_the_gpu=False)
+        self.assertEqual(len(res), 3)
+        self.assertIsNone(res[0])
+        self.assertIsNone(res[1])
+        self.assertIsNotNone(res[2])
+        self.assertEqual(len(res[2]), 2)
+
+    def test_parse_negative(self):
+        batch_size = 1
+        self.links_file = get_data_path('negative.txt')
+        self.fasta_file = get_data_path('prots.fa')
+
+        res = parse(self.fasta_file, self.links_file,
+                    training_column=4,
+                    batch_size=batch_size,
+                    num_workers=1, arm_the_gpu=False)
+        self.assertEqual(len(res), 3)
+        self.assertIsNone(res[0])
+        self.assertIsNotNone(res[1])
+        self.assertIsNotNone(res[2])
+        self.assertEqual(len(res[2]), 2)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,4 @@
+negative1	negative2	Negatome	300	Test
+negative3	negative4	Negatome	300	Test
+negative4	negative5	Negatome	300	Validate
+negative6	negative7	Negatome	300	Validate
