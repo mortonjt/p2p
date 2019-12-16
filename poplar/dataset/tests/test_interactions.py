@@ -23,7 +23,7 @@ class TestPreprocess(unittest.TestCase):
         seqids = list(map(lambda x: x.id, truncseqs))
         seqdict = dict(zip(seqids, truncseqs))
         pairs = preprocess(seqdict, links)
-        self.assertListEqual(list(pairs.shape), [99, 2])
+        self.assertListEqual(list(pairs.shape), [100, 2])
 
 
 class TestInteractionDataset(unittest.TestCase):
@@ -39,6 +39,9 @@ class TestInteractionDataset(unittest.TestCase):
         seqids = list(map(lambda x: x.id, truncseqs))
         seqdict = dict(zip(seqids, truncseqs))
         self.pairs = preprocess(seqdict, links)
+
+    def test_sort(self):
+        pass
 
     def test_random_peptide(self):
         # Test the random_peptide function
@@ -105,23 +108,20 @@ class TestValidationDataset(unittest.TestCase):
         self.fasta_file = get_data_path('prots.fa')
 
         self.seqs = list(SeqIO.parse(self.fasta_file, format='fasta'))
-        links = pd.read_table(self.links_file, header=None)
+        self.links = pd.read_table(self.links_file, header=None)
 
         truncseqs = list(map(clean, self.seqs))
         seqids = list(map(lambda x: x.id, truncseqs))
         seqdict = dict(zip(seqids, truncseqs))
-        negative = (links[2] == 'Negatome')
-        pos_links = links.loc[~negative]
-        neg_links = links.loc[negative]
 
-        self.pos_pairs = preprocess(seqdict, pos_links)
-        self.neg_pairs = preprocess(seqdict, neg_links)
+        self.pairs = preprocess(seqdict, self.links)
 
     def test_getitem(self):
         np.random.seed(0)
         sampler = NegativeSampler(self.seqs)
-        intsd = ValidationDataset(self.pos_pairs, self.neg_pairs, sampler)
-        gene, pos, neg1, neg2, rnd = intsd[0]
+        intsd = ValidationDataset(self.pairs, self.links, sampler)
+
+        gene, pos, rnd, protid, taxa = intsd[0]
 
         exp_gene = list(
             'MINEIKKEAQERMGKTLEALGHAFAKIRTGRAHPSILDSVMVSYYGADTPLRQVANVTV'
@@ -141,36 +141,17 @@ class TestValidationDataset(unittest.TestCase):
             'RAYDMVLNGTELGGGSIRIHDKSMQQAVFRVLGIDEAEQEEKFGFLLDALKYGAPPHGG'
             'LAFGLDRLVMLMTGASSIREVIAFPKTQSAGDVMTQAPGSVDGKALRELHIRLREQPKAE'
         )
-
-        exp_neg1 = list(
-            'VIGMLISDGSWARIPSRYHDAMLQAATRVRQRLANNLETLDRECSNNIQKAGVSIVHLT'
-            'PVLGTCFRICGFDIKDAPNARLAPLLKAGSIDGFLSVHLFTWATGFYRYISYALDTKIC'
-            'PAFYDMSSLGGEREGIRKLKSSRPGQAAPLDGAVFSCLGLSELAPDSGIYTLSVPFLIQ'
-            'NEKMRTYFFMSVCSVLTCFGLYAKEKVVLKIASIAPARSIWETELKKLSAEWSEITGGL'
-            'VSMKDLERVLHELREDLDRPFRAAGFRVITWTNAGWLSFYTRAPYASLGQLKKQTIALS'
-            'SLDSS'
-        )
-
-        exp_neg2 = list(
-            'PSRYHDAMLQAATRVRQRLANNLETLDRECSNNIQKAGVSIVHLTPVIGMLISDGSWAR'
-            'IDAPNARLAPLLKAGSIDGFLSVHLFTWATGFYRYISYALDTKICPAVLGTCFRICGFD'
-            'IKRKLKSSRPGQAAPLDGAVFSCLGLSELAPDSGIYTLSVPFLIQNEKFYDMSSLGGER'
-            'EGICFGLYAKEKVVLKIASIAPARSIWETELKKLSAEWSEITGGLVSMKMRTYFFMSVC'
-            'SVLTRPFRAAGFRVITWTNAGWLSFYTRAPYASLGQLKKQTIALSSLDSSDLERVLHEL'
-            'REDLD'
-        )
         exp_rnd = list(
             'MINEIKKEAQERMGKTLEALGHAFAKIRTGRAHPSILDSVMVSYYGADTPLRQVANVTV'
             'EDSRTLALAVFDKSMIQAVEKAIMTSDLGLNPATAGTTIRVPMPALTEETRKGYTKQAR'
             'AEAEQARVSVRNIRRDALAQLKDLQKEKEISEDEERRAGDDVQKLTDKFIGEIEKALEA'
             'KEADLMAV'
         )
-
         self.assertListEqual(list(gene), exp_gene)
         self.assertListEqual(list(pos), exp_pos)
-        self.assertListEqual(list(neg1), exp_neg1)
-        self.assertListEqual(list(neg2), exp_neg2)
         self.assertListEqual(list(rnd), exp_rnd)
+        self.assertEqual(protid, '287.DR97_4286')
+        self.assertEqual(taxa, 287)
 
 
     def test_iter(self):
@@ -178,9 +159,14 @@ class TestValidationDataset(unittest.TestCase):
         # negative samples are being drawn
         np.random.seed(0)
         sampler = NegativeSampler(self.seqs)
-        intsd = ValidationDataset(self.pos_pairs, self.neg_pairs, sampler)
+        intsd = ValidationDataset(self.pairs, self.links, sampler)
         res = [r for r in intsd]
-        self.assertEqual(len(res), self.pos_pairs.shape[0] * intsd.num_neg)
+        self.assertEqual(len(res), self.pairs.shape[0] * intsd.num_neg)
+        gene, pos, rnd, idx, taxa = list(zip(*res))
+        ids = list(zip(idx, taxa))
+        # make sure that if sorted, the list will be in the same order
+        sorted_idx = sorted(ids, key=lambda x: (x[0], x[1]))
+        self.assertListEqual(sorted_idx, ids)
 
 
 class TestParse(unittest.TestCase):
@@ -202,7 +188,7 @@ class TestParse(unittest.TestCase):
         i = 0
         for g, p, n in train:
             i+= 1
-        self.assertEqual(len(train), 82)
+        self.assertEqual(len(train), 83)
 
         i = 0
         for g, p, n in test:

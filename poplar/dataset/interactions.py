@@ -26,6 +26,7 @@ def preprocess(seqdict, links):
     """
     # 0 = protein 1
     # 1 = protein 2
+
     pairs = links.apply(
         lambda x: (np.array(seqdict[x[0]].seq),
                    np.array(seqdict[x[1]].seq)),
@@ -152,6 +153,9 @@ class InteractionDataset(Dataset):
             Model for drawing negative samples for training
         num_neg : int
             Number of negative samples
+        sort : bool
+            Specifies if the pairs should be sorted by
+            protein id1 then by taxonomy.
         seed : int
             Random seed
         """
@@ -161,6 +165,7 @@ class InteractionDataset(Dataset):
         self.sampler = sampler
         if sampler is None:
             self.num_neg = 1
+
 
     def random_peptide(self):
         if self.sampler is None:
@@ -215,8 +220,7 @@ class ValidationDataset(InteractionDataset):
 
     This class likely does not need multiple workers either.
     """
-
-    def __init__(self, pos_pairs, neg_pairs, sampler=None, num_neg=10, seed=0):
+    def __init__(self, pairs, links, sampler=None, num_neg=10, seed=0):
         """ Read in pairs of proteins
 
         Parameters
@@ -224,6 +228,8 @@ class ValidationDataset(InteractionDataset):
         pairs: np.array of str
             Pairs of proteins that are experimentally validated to have
             an interaction.
+        links : pd.DataFrame
+            The original links dataframe
         sampler : poplar.sample.NegativeSampler
             Model for drawing negative samples for training
         num_neg : int
@@ -231,76 +237,71 @@ class ValidationDataset(InteractionDataset):
         seed : int
             Random seed
         """
-        super().__init__(pos_pairs, sampler, num_neg, seed)
-        self.neg_pairs = neg_pairs
+        super().__init__(pairs, sampler, num_neg, seed)
+        # sort values by protein 1 and taxonomy
+        self.links = links.sort_values([0, 3])
+
 
     def __getitem__(self, i):
         """ Retrieves protein pairs
 
-        Parameters
-        ----------
+        Returns
+        -------
         gene : str
             Protein of interest
         pos : str
             Positive interacting protein
-        neg1 : str
-            Random negative protein
-        neg2 : str
-            Random protein known not to interact with neg1.
         rnd : str
             Random protein
+        protid : str
+            ID of protein 1
+        taxa : str
+            ID of organism
 
-        TODO: this should also specify which species is being evaluated!
+        Notes
+        -----
+        0 : protein 1 id
+        3 : taxonomy id
         """
         gene = self.pairs[i, 0]
         pos = self.pairs[i, 1]
         rnd = self.random_peptide()
-
-        j = np.random.randint(0, len(self.neg_pairs))
-
-        neg1 = self.neg_pairs[j, 0]
-        neg2 = self.neg_pairs[j, 1]
+        protid = self.links.loc[i, 0]
+        taxa = self.links.loc[i, 3]
 
         return (
-            ''.join(gene), ''.join(pos),
-            ''.join(neg1), ''.join(neg2),
-            ''.join(rnd)
+            ''.join(gene), ''.join(pos), ''.join(rnd), protid, taxa
         )
+
 
     def __iter__(self):
         """ Retrieves an iterable of protein pairs
 
-        Parameters
-        ----------
+        This iterates on a sorted taxa/protein level.
+
+        Returns
+        -------
         gene : str
             Protein of interest
         pos : str
             Positive interacting protein
-        neg1 : str
-            Random negative protein
-        neg2 : str
-            Random protein known not to interact with neg1.
         rnd : str
             Random protein
+        taxa : str
+            ID of taxa
+        protid : str
+            ID of protein 1
+
+        Notes
+        -----
+        0 : protein 1 id
+        3 : taxonomy id
         """
-        worker_info = torch.utils.data.get_worker_info()
-        start = 0
-        end = len(self.pairs)
-
-        if worker_info is None:  # single-process data loading
-            for i in range(end):
+        for idx, group in self.links.groupby([3, 0]):
+            tax, protid = idx
+            for i in group.index:
+                gene = self.pairs[i, 0]
+                pos = self.pairs[i, 1]
                 for _ in range(self.num_neg):
-                    yield self.__getitem__(i)
-        else:
-            worker_id = worker_info.id
-            w = float(worker_info.num_workers)
-
-            t = (end - start)
-            w = float(worker_info.num_workers)
-            per_worker = int(math.ceil(t / w))
-            worker_id = worker_info.id
-            iter_start = start + worker_id * per_worker
-            iter_end = min(iter_start + per_worker, end)
-            for i in range(iter_start, iter_end):
-                for _ in range(self.num_neg):
-                    yield self.__getitem__(i)
+                    rnd = self.random_peptide()
+                    yield gene, pos, rnd, tax, protid
