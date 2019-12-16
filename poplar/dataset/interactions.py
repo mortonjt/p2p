@@ -121,14 +121,13 @@ class InteractionDataDirectory(Dataset):
         return len(self.filenames)
 
     def total(self):
-        t = 0
-        for fname in self.filenames:
-            res = parse(self.fasta_file, fname, self.training_column,
-                        self.batch_size, num_neg, self.num_workers,
-                        self.arm_the_gpu)
-            # number of sequences in a dataset = (num batch) x (batch size)
-            t += len(res[0]) * res[0].batch_size
-        return t
+        fname = self.filenames[0]
+        res = parse(self.fasta_file, fname, self.training_column,
+                    self.batch_size, num_neg, self.num_workers,
+                    self.arm_the_gpu)
+        # number of sequences in a dataset = (num batch) x (batch size)
+        t = len(res[0]) * res[0].batch_size
+        return t * len(self.filenames)
 
     def __iter__(self):
         return (

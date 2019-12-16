@@ -8,6 +8,7 @@ import torch.optim as optim
 from fairseq.models.roberta import RobertaModel
 from poplar.model.transformer import RobertaConstrastiveHead
 from poplar.dataset.interactions import InteractionDataDirectory
+from poplar.dataset.interactions import ValidationDataset
 from poplar.util import encode, tokenize
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils import clip_grad_norm_
@@ -68,7 +69,7 @@ def simple_ppitrain(
 
     # optimizer = optim.Adamax(finetuned_model.parameters(), betas=betas)
     optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
-    # uncomment for production ready code
+
     if max_steps > 0:
         num_data = directory_dataloader.total()
         t_total = (max_steps // gradient_accumulation_steps) + 1
@@ -78,14 +79,9 @@ def simple_ppitrain(
         t_total = num_data // gradient_accumulation_steps
         epochs = 1
 
-    # test run
-    # num_data = 3e6
-    # t_total = (max_steps // gradient_accumulation_steps) + 1
-    # epochs = int(t_total // num_data)
+    scheduler = WarmupLinearSchedule(
+        optimizer, warmup_steps=warmup_steps, t_total=t_total)
 
-    scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
-    # quick and dirty scheduler
-    #scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=300000 * 31)
     finetuned_model.to(device)
     n_gpu = torch.cuda.device_count()
     print(os.environ["CUDA_VISIBLE_DEVICES"], 'devices available')
