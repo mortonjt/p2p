@@ -31,9 +31,14 @@ class RobertaConstrastiveHead(nn.Module):
 
         Parameters
         ----------
-        emb_size: Embedding size.
-        emb_dimention: Embedding dimention,
-             typically from 50 to 500.
+        emb_size: int
+            Embedding size.
+        emb_dimention: int
+            Embedding dimention, typically from 50 to 500.
+
+        TODO:
+          1. Rename this transformer file to something else (i.e. ppi).
+          2. Rename RobertaConstrastiveHead to PPBinder
         """
         # See here: https://adoni.github.io/2017/11/08/word2vec-pytorch/
         super(RobertaConstrastiveHead, self).__init__()
