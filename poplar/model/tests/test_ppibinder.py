@@ -2,16 +2,16 @@ import torch
 import unittest
 import numpy as np
 import numpy.testing as npt
-from poplar.model.transformer import RobertaConstrastiveHead
+from poplar.model.ppibinder import PPBinder
 
 
-class TestTransformer(unittest.TestCase):
+class TestPPBinder(unittest.TestCase):
 
     def setUp(self):
         self.dim = 5
         self.emb = 3
 
-        self.model = RobertaConstrastiveHead(self.dim, self.emb)
+        self.model = PPBinder(self.dim, self.emb)
 
         self.model.u_embeddings.weight = torch.nn.Parameter(
             torch.from_numpy(

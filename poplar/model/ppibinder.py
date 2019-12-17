@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import math
 
 
-class RobertaConstrastiveHead(nn.Module):
+class PPIBinder(nn.Module):
     def __init__(self, emb_size, emb_dimension):
         """ Initialize model parameters.
 
