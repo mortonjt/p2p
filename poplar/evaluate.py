@@ -42,13 +42,17 @@ def roc_auc(model, dataloader, k=10):
     sorted by (1) taxonomy then by (2) protein1.
     """
 
-def pairwise_auc(model, dataloader, name, it, writer):
+def pairwise_auc(pretrained_model, binding_model,
+                 dataloader, name, it, writer,
+                 device='cpu'):
     """ Pairwise AUC comparison
 
     Parameters
     ----------
-    model : popular.model
-       Model to be evaluated.
+    language_model : popular.model
+       Language model.
+    binding_model : popular.model
+       Binding prediction model.
     dataloader : torch.DataLoader
        Pytorch dataloader.
     name : str
@@ -57,6 +61,8 @@ def pairwise_auc(model, dataloader, name, it, writer):
        Iteration number.
     writer : SummaryWriter
        Tensorboard writer.
+    device : str
+       Device name to transfer model data to.
 
     Returns
     -------
@@ -65,20 +71,21 @@ def pairwise_auc(model, dataloader, name, it, writer):
     with torch.no_grad():
         rank_counts = 0
         batch_size = dataloader.batch_size
-        for j, (gene, pos, rnd, tax, protid) in enumerate(test_dataloader):
+        for j, (gene, pos, rnd, tax, protid) in enumerate(dataloader):
             gv, pv, nv = tokenize(gene, pos, rnd,
                                   pretrained_model, device)
-            cv_score = finetuned_model.forward(gv, pv, nv)
-            pred_pos = finetuned_model.predict(gv, pv)
-            pred_neg = finetuned_model.predict(gv, nv)
+            cv_score = binding_model.forward(gv, pv, nv)
+            pred_pos = binding_model.predict(gv, pv)
+            pred_neg = binding_model.predict(gv, nv)
             cv_err += cv_score.item()
             pos_score += torch.sum(pred_pos).item()
             rank_counts += torch.sum(pred_pos > pred_neg).item()
 
-        avg_rank = rank_counts / len(test_dataloader)
+        total = max(1, len(dataloader))
+        print('dataloader', len(dataloader))
+        avg_rank = rank_counts / total
         tpr = avg_rank / batch_size
         print(f'rank_counts {avg_rank}, tpr {tpr}, iteration {it}')
-        writer.add_scalar(f'{name}/pairwise/rank_count', cv_err, it)
         writer.add_scalar(f'{name}/pairwise/TPR', tpr, it)
 
     return tpr

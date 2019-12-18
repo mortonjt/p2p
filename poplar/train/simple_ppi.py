@@ -10,6 +10,7 @@ from poplar.model.ppibinder import PPIBinder
 from poplar.dataset.interactions import InteractionDataDirectory
 from poplar.dataset.interactions import ValidationDataset
 from poplar.util import encode, tokenize
+from poplar.evaluate import pairwise_auc
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils import clip_grad_norm_
 from transformers import AdamW, WarmupLinearSchedule
@@ -22,7 +23,7 @@ def simple_ppitrain(
         learning_rate=5e-5, warmup_steps=1000,
         gradient_accumulation_steps=1,
         clip_norm=10., summary_interval=100, checkpoint_interval=100,
-        model_path='model', device=None):
+        model_path='model', device='cpu'):
     """ Train the protein-protein interaction model.
 
     Parameters
@@ -123,7 +124,6 @@ def simple_ppitrain(
             for j, (gene, pos, neg) in enumerate(train_dataloader):
                 last_now = now
                 now = time.time()
-
                 g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
                 loss = finetuned_model.forward(g, p, n)
 
@@ -136,8 +136,6 @@ def simple_ppitrain(
 
                 it += len(gene)
                 err = loss.item()
-                print(f'epoch {e}, dataset {k}, batch {j}, err {err}, total batches {num_batches}, '
-                      f'seconds / batch {now - last_now}')
 
                 # write down summary stats
                 if (now - last_summary_time) > summary_interval:
@@ -171,7 +169,8 @@ def simple_ppitrain(
                     finetuned_model.zero_grad()
 
             # cross validation after each dataset is processed
-            tpr = pairwise_auc(model, dataloader, name, it, writer)
+            tpr = pairwise_auc(pretrained_model, finetuned_model,
+                               dataloader[1], 'Main/test', it, writer, device)
 
 
     # save hparams
@@ -266,7 +265,6 @@ def simple_ppirun(
 
     n_gpu = torch.cuda.device_count()
     batch_size = max(batch_size, batch_size * n_gpu)
-    print('batch_size', batch_size)
     interaction_directory = InteractionDataDirectory(
         fasta_file, links_directory, training_column,
         batch_size, num_workers, device

@@ -20,7 +20,14 @@ class DummyModel(nn.Module):
         self.decoder = nn.Linear(input_size, hidden_size)
 
     def extract_features(self, x):
-        return self.encoder(x)
+        y = self.encoder(x)
+        if len(y.shape) == 2:
+            y = y.view(1, y.shape[0], y.shape[-1])
+
+        z = y.mean(1)
+        z = z.view(y.shape[0], 1, y.shape[-1])
+        u = torch.cat((z, y), 1)
+        return u
 
     def forward(self, x):
         y = self.encoder(x)
