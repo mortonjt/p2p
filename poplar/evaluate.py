@@ -53,8 +53,8 @@ def pairwise_auc(pretrained_model, binding_model,
        Language model.
     binding_model : popular.model
        Binding prediction model.
-    dataloader : torch.DataLoader
-       Pytorch dataloader.
+    dataloader : poplar.dataset.interactions.ValidationDataset
+       Dataset iterator for test/validation ppi dataset.
     name : str
        Name of the database used in dataloader.
     it : int
@@ -70,21 +70,17 @@ def pairwise_auc(pretrained_model, binding_model,
     """
     with torch.no_grad():
         rank_counts = 0
-        batch_size = dataloader.batch_size
+
         for j, (gene, pos, rnd, tax, protid) in enumerate(dataloader):
             gv, pv, nv = tokenize(gene, pos, rnd,
                                   pretrained_model, device)
             cv_score = binding_model.forward(gv, pv, nv)
             pred_pos = binding_model.predict(gv, pv)
             pred_neg = binding_model.predict(gv, nv)
-            cv_err += cv_score.item()
-            pos_score += torch.sum(pred_pos).item()
             rank_counts += torch.sum(pred_pos > pred_neg).item()
 
         total = max(1, len(dataloader))
-        print('dataloader', len(dataloader))
-        avg_rank = rank_counts / total
-        tpr = avg_rank / batch_size
+        tpr = rank_counts / total
         print(f'rank_counts {avg_rank}, tpr {tpr}, iteration {it}')
         writer.add_scalar(f'{name}/pairwise/TPR', tpr, it)
 

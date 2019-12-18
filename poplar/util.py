@@ -106,14 +106,18 @@ def encode(x):
 
 
 def tokenize(gene, pos, neg, model, device, pad=1024):
+    if len(gene) == len(pos) and len(gene) == len(neg):
+        # extract features, and take <CLS> token
+        g = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], gene))
+        p = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], pos))
+        n = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], neg))
 
-    # extract features, and take <CLS> token
-    g = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], gene))
-    p = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], pos))
-    n = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], neg))
-
-    g_ = torch.cat(g, 0)
-    p_ = torch.cat(p, 0)
-    n_ = torch.cat(n, 0)
+        g_ = torch.cat(g, 0)
+        p_ = torch.cat(p, 0)
+        n_ = torch.cat(n, 0)
+    else:
+        g_ = model.extract_features(encode(gene))[:, 0, :]
+        p_ = model.extract_features(encode(pos))[:, 0, :]
+        n_ = model.extract_features(encode(neg))[:, 0, :]
 
     return g_, p_, n_

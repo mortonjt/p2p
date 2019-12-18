@@ -77,17 +77,13 @@ def parse(fasta_file, links_file, training_column=4,
         train_dataset = InteractionDataset(train_pairs, sampler, num_neg=num_neg)
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
                                       shuffle=True, num_workers=num_workers,
-                                      drop_last=True, pin_memory=arm_the_gpu)
+                                      drop_last=False, pin_memory=arm_the_gpu)
     if len(test_pairs) > 0:
-        test_dataset = InteractionDataset(test_pairs, sampler, num_neg=num_neg)
-        test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
-                                      shuffle=True, num_workers=num_workers,
-                                      drop_last=True, pin_memory=arm_the_gpu)
+        test_dataloader = ValidationDataset(test_pairs, test_links,
+                                            sampler, num_neg=num_neg)
     if len(valid_pairs) > 0:
-        valid_dataset = InteractionDataset(valid_pairs, sampler, num_neg=num_neg)
-        valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size,
-                                      shuffle=True, num_workers=num_workers,
-                                      drop_last=True, pin_memory=arm_the_gpu)
+        valid_dataloader = ValidationDataset(valid_pairs, valid_links,
+                                             sampler, num_neg=num_neg)
 
     return train_dataloader, test_dataloader, valid_dataloader
 
@@ -299,6 +295,7 @@ class ValidationDataset(InteractionDataset):
         for idx, group in self.links.groupby([3, 0]):
             tax, protid = idx
             for i in group.index:
+                print(i, group.index, self.pairs.shape)
                 gene = self.pairs[i, 0]
                 pos = self.pairs[i, 1]
                 for _ in range(self.num_neg):
