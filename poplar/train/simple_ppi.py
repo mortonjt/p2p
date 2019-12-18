@@ -64,25 +64,29 @@ def simple_ppitrain(
 
     TODO
     ----
-    Enable per test dataset dataloaders
+    1. Enable positive dataloaders.
+    2. Enable negative dataloaders.
+    3. Update the run scripts.
+    4. Preferably come up with a better name rather than simple_ppi
+       (i.e. binary contact, binary-binding)
+    5. Include language model inside the prediction model?
+       May make it easier to modularize.
+    6. Add tests for remaining evaluation functions.
+
+
     """
     last_summary_time = time.time()
     last_checkpoint_time = time.time()
     # the dimensionality of the roberta model
     roberta_dim = int(list(list(pretrained_model.parameters())[-1].shape)[0])
     finetuned_model = PPIBinder(roberta_dim, emb_dimension)
-
-    # optimizer = optim.Adamax(finetuned_model.parameters(), betas=betas)
     optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
 
-    if max_steps > 0:
-        num_data = directory_dataloader.total()
-        t_total = (max_steps // gradient_accumulation_steps) + 1
-        epochs = max(int(t_total // num_data), 1)
-    else:
-        num_data = directory_dataloader.total()
-        t_total = num_data // gradient_accumulation_steps
-        epochs = 1
+    num_data = directory_dataloader.total()
+    t_total = num_data // gradient_accumulation_steps
+    max_steps = max(1, max_steps)
+    steps_per_epoch = max(t_total // num_data, 1)
+    epochs = max_steps // steps_per_epoch
 
     scheduler = WarmupLinearSchedule(
         optimizer, warmup_steps=warmup_steps, t_total=t_total)
@@ -96,18 +100,8 @@ def simple_ppitrain(
             finetuned_model = torch.nn.DataParallel(finetuned_model)
 
     # Initialize logging path
-    if logging_path is None:
-        basename = "logdir"
-        suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
-        logging_path = "_".join([basename, suffix])
-    it = 0
-    writer = SummaryWriter(logging_path)
-
-    # metrics to report
-    err, cv_err, tpr, pos_score, batch_size = 0, 0, 0, 0, 0
-
-    now = time.time()
-    last_now = time.time()
+    writer = initialize_logging(logging_path=None)i
+    it = 0 # number of steps (iterations)
     print('Number of pairs', num_data)
     print('Number datasets', len(directory_dataloader))
     print('Number of epochs', epochs)
@@ -116,14 +110,10 @@ def simple_ppitrain(
             finetuned_model.train()
             train_dataloader, test_dataloader, valid_dataloader = dataloader
             num_batches = len(train_dataloader)
-            num_cv_batches = len(test_dataloader)
             batch_size = train_dataloader.batch_size
 
-            print(f'dataset {k}, num_batches {num_batches}, num_cvs {num_cv_batches}, '
-                  f'seconds / batch {now - last_now}')
+            print(f'dataset {k}, num_batches {num_batches}')
             for j, (gene, pos, neg) in enumerate(train_dataloader):
-                last_now = now
-                now = time.time()
                 g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
                 loss = finetuned_model.forward(g, p, n)
 
@@ -138,28 +128,19 @@ def simple_ppitrain(
                 err = loss.item()
 
                 # write down summary stats
-                if (now - last_summary_time) > summary_interval:
-                    # add gradients to histogram
-                    writer.add_scalar('train_error', err, it)
-                    for name, param in finetuned_model.named_parameters():
-                        writer.add_histogram('grad/%s' %  name, param.grad, it)
-                    last_summary_time = now
+                last_summary_time = summarize_gradients(
+                    finetuned_model, summary_interval,
+                    last_summary_time, writer)
 
                 # clean up
                 del loss, g, p, n
                 if 'cuda' in device:
                     torch.cuda.empty_cache()
 
-                if (now - last_checkpoint_time) > checkpoint_interval:
-                    suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
-                    model_path_ = model_path + suffix
-                    # for parallel training
-                    try:
-                        state_dict = finetuned_model.module.state_dict()
-                    except AttributeError:
-                        state_dict = finetuned_model.state_dict()
-                    torch.save(state_dict, model_path_)
-                    last_checkpoint_time = now
+                # checkpoint
+                last_checkpoint_time = checkpoint(
+                    model, path, checkpoint_interval,
+                    last_checkpoint_time, writer)
 
                 # accumulate gradients - so that we do backprop after loss
                 # has been calculated on entire batch

@@ -41,6 +41,7 @@ def roc_auc(model, dataloader, k=10):
     Make sure that the test/validation dataset are
     sorted by (1) taxonomy then by (2) protein1.
     """
+    pass
 
 def pairwise_auc(pretrained_model, binding_model,
                  dataloader, name, it, writer,
