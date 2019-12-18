@@ -1,6 +1,8 @@
 import unittest
 
+
 class TestGlobalMetrics(unittest.TestCase):
+
     def setUp(self):
         pass
 

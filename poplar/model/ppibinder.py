@@ -21,7 +21,7 @@ class PPIBinder(nn.Module):
           2. Rename RobertaConstrastiveHead to PPBinder
         """
         # See here: https://adoni.github.io/2017/11/08/word2vec-pytorch/
-        super(RobertaConstrastiveHead, self).__init__()
+        super(PPIBinder, self).__init__()
         self.emb_size = emb_size
         self.emb_dimension = emb_dimension
         # TODO: swap u and v with linear layers

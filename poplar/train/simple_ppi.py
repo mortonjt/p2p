@@ -6,7 +6,7 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 from fairseq.models.roberta import RobertaModel
-from poplar.model.transformer import RobertaConstrastiveHead
+from poplar.model.ppibinder import PPIBinder
 from poplar.dataset.interactions import InteractionDataDirectory
 from poplar.dataset.interactions import ValidationDataset
 from poplar.util import encode, tokenize
@@ -17,20 +17,24 @@ from transformers import AdamW, WarmupLinearSchedule
 
 def simple_ppitrain(
         pretrained_model, directory_dataloader,
-        negative_sampler, logging_path=None,
-        emb_dimension=100, max_steps=0,
+        positive_dataloaders, negative_dataloaders,
+        logging_path=None, emb_dimension=100, max_steps=0,
         learning_rate=5e-5, warmup_steps=1000,
         gradient_accumulation_steps=1,
         clip_norm=10., summary_interval=100, checkpoint_interval=100,
         model_path='model', device=None):
-    """ Train the roberta model
+    """ Train the protein-protein interaction model.
 
     Parameters
     ----------
     pretrained_model : fairseq.models.roberta.RobertaModel
         Pretrained Roberta model.
     directory_dataloader : InteractionDataDirectory
-        Creates dataloaders
+        Creates dataloaders.
+    positive_dataloaders : list of dataloaders
+        List of torch dataloaders for interactions
+    negative_dataloaders : list of dataloaders
+        List of torch dataloaders for interactions
     logging_path : path
         Path of logging file.
     emb_dimension : int
@@ -55,7 +59,7 @@ def simple_ppitrain(
 
     Returns
     -------
-    finetuned_model : poplar.transformer.RobertaConstrastiveHead
+    finetuned_model : poplar.ppbinder.PPBinder
 
     TODO
     ----
@@ -65,7 +69,7 @@ def simple_ppitrain(
     last_checkpoint_time = time.time()
     # the dimensionality of the roberta model
     roberta_dim = int(list(list(pretrained_model.parameters())[-1].shape)[0])
-    finetuned_model = RobertaConstrastiveHead(roberta_dim, emb_dimension)
+    finetuned_model = PPIBinder(roberta_dim, emb_dimension)
 
     # optimizer = optim.Adamax(finetuned_model.parameters(), betas=betas)
     optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
@@ -73,7 +77,7 @@ def simple_ppitrain(
     if max_steps > 0:
         num_data = directory_dataloader.total()
         t_total = (max_steps // gradient_accumulation_steps) + 1
-        epochs = t_total // num_data
+        epochs = max(int(t_total // num_data), 1)
     else:
         num_data = directory_dataloader.total()
         t_total = num_data // gradient_accumulation_steps
@@ -84,10 +88,11 @@ def simple_ppitrain(
 
     finetuned_model.to(device)
     n_gpu = torch.cuda.device_count()
-    print(os.environ["CUDA_VISIBLE_DEVICES"], 'devices available')
-    print("Utilizing ", torch.cuda.device_count(), device)
-    if n_gpu > 1:
-        finetuned_model = torch.nn.DataParallel(finetuned_model)
+    if "CUDA_VISIBLE_DEVICES" in os.environ:
+        print(os.environ["CUDA_VISIBLE_DEVICES"], 'devices available')
+        print("Utilizing ", torch.cuda.device_count(), device)
+        if n_gpu > 1:
+            finetuned_model = torch.nn.DataParallel(finetuned_model)
 
     # Initialize logging path
     if logging_path is None:
@@ -108,7 +113,7 @@ def simple_ppitrain(
     for e in range(epochs):
         for k, dataloader in enumerate(directory_dataloader):
             finetuned_model.train()
-            train_dataloader, test_dataloader = dataloader
+            train_dataloader, test_dataloader, valid_dataloader = dataloader
             num_batches = len(train_dataloader)
             num_cv_batches = len(test_dataloader)
             batch_size = train_dataloader.batch_size
@@ -166,41 +171,8 @@ def simple_ppitrain(
                     finetuned_model.zero_grad()
 
             # cross validation after each dataset is processed
-            with torch.no_grad():
-                cv_err, pos_score, rank_counts = 0, 0, 0
-                batch_size = test_dataloader.batch_size
-                for j, (cv_gene, cv_pos, cv_neg) in enumerate(test_dataloader):
-                    gv, pv, nv = tokenize(cv_gene, cv_pos, cv_neg,
-                                          pretrained_model, device)
-                    cv_score = finetuned_model.forward(gv, pv, nv)
-                    pred_pos = finetuned_model.predict(gv, pv)
-                    pred_neg = finetuned_model.predict(gv, nv)
-                    cv_err += cv_score.item()
-                    pos_score += torch.sum(pred_pos).item()
-                    rank_counts += torch.sum(pred_pos > pred_neg).item()
-                    print(f'epoch {e}, dataset {k}, batch {j}, cv_err {cv_err}, '
-                          f'rank_counts {rank_counts}, '
-                          f'total batches {num_cv_batches}, '
-                          f'seconds / batch {now - last_now}')
+            tpr = pairwise_auc(model, dataloader, name, it, writer)
 
-                    #clean up
-                    del pred_pos, pred_neg, cv_score, gv, pv, nv
-                    if 'cuda' in device:
-                        torch.cuda.empty_cache()
-
-                if len(test_dataloader) > 0:
-                    cv_err = cv_err / len(test_dataloader)
-                    avg_rank = rank_counts / len(test_dataloader)
-                    tpr = avg_rank / batch_size
-                    pos_score = pos_score / len(test_dataloader)
-                    print(f'epoch {e}, dataset {k}, batch {j}, cv_err {cv_err}, '
-                          f'rank_counts {avg_rank}, tpr {tpr}, '
-                          f'pos_score {pos_score}, '
-                          f'total batches {num_cv_batches}, '
-                          f'seconds / batch {now - last_now}')
-                    writer.add_scalar('test_error', cv_err, it)
-                    writer.add_scalar('TPR', tpr, it)
-                    writer.add_scalar('pos_score', pos_score, it)
 
     # save hparams
     writer.add_hparams(

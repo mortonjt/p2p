@@ -2,7 +2,7 @@ import torch
 import unittest
 import numpy as np
 import numpy.testing as npt
-from poplar.model.ppibinder import PPBinder
+from poplar.model.ppibinder import PPIBinder
 
 
 class TestPPBinder(unittest.TestCase):

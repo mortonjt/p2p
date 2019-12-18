@@ -106,7 +106,7 @@ class NegativeSampler(object):
 class InteractionDataDirectory(Dataset):
 
     def __init__(self, fasta_file, links_directory,
-                 training_column=2, num_neg=5,
+                 training_column=4, num_neg=5,
                  batch_size=10, num_workers=1, arm_the_gpu=False):
         print('links_directory', links_directory)
         self.fasta_file = fasta_file
@@ -115,6 +115,7 @@ class InteractionDataDirectory(Dataset):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.arm_the_gpu = arm_the_gpu
+        self.num_neg = num_neg
         self.index = 0
 
     def __len__(self):
@@ -123,7 +124,7 @@ class InteractionDataDirectory(Dataset):
     def total(self):
         fname = self.filenames[0]
         res = parse(self.fasta_file, fname, self.training_column,
-                    self.batch_size, num_neg, self.num_workers,
+                    self.batch_size, self.num_neg, self.num_workers,
                     self.arm_the_gpu)
         # number of sequences in a dataset = (num batch) x (batch size)
         t = len(res[0]) * res[0].batch_size
@@ -132,7 +133,7 @@ class InteractionDataDirectory(Dataset):
     def __iter__(self):
         return (
             parse(self.fasta_file, fname, self.training_column,
-                  self.batch_size, num_neg, self.num_workers,
+                  self.batch_size, self.num_neg, self.num_workers,
                   self.arm_the_gpu)
             for fname in self.filenames
         )
@@ -207,7 +208,6 @@ class InteractionDataset(Dataset):
 
 class ValidationDataset(InteractionDataset):
     """ Dataset for validation.
-
     Question: Do we even need this class???
 
     TODO:

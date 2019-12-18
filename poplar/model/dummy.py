@@ -15,7 +15,7 @@ class DummyModel(nn.Module):
     transformer model.  But also for testing.
     """
     def __init__(self, input_size, hidden_size):
-
+        super(DummyModel, self).__init__()
         self.encoder = nn.Embedding(input_size, hidden_size)
         self.decoder = nn.Linear(input_size, hidden_size)
 
