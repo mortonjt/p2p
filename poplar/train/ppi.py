@@ -16,14 +16,13 @@ from torch.nn.utils import clip_grad_norm_
 from transformers import AdamW, WarmupLinearSchedule
 
 
-def simple_ppitrain(
-        pretrained_model, directory_dataloader,
-        positive_dataloaders, negative_dataloaders,
-        logging_path=None, emb_dimension=100, max_steps=0,
-        learning_rate=5e-5, warmup_steps=1000,
-        gradient_accumulation_steps=1,
-        clip_norm=10., summary_interval=100, checkpoint_interval=100,
-        model_path='model', device='cpu'):
+def train(pretrained_model, directory_dataloader,
+          positive_dataloaders, negative_dataloaders,
+          logging_path=None, emb_dimension=100, max_steps=0,
+          learning_rate=5e-5, warmup_steps=1000,
+          gradient_accumulation_steps=1,
+          clip_norm=10., summary_interval=100, checkpoint_interval=100,
+          model_path='model', device='cpu'):
     """ Train the protein-protein interaction model.
 
     Parameters
@@ -175,8 +174,7 @@ def simple_ppitrain(
     return finetuned_model
 
 
-def simple_ppirun(
-        fasta_file, training_directory, test_datasets,
+def ppi(fasta_file, training_directory, test_datasets,
         checkpoint_path, data_dir, model_path, logging_path,
         training_column='Training',
         emb_dimension=100, num_neg=10,
@@ -185,7 +183,7 @@ def simple_ppirun(
         clip_norm=10, batch_size=10, num_workers=10,
         summary_interval=1, checkpoint_interval=1000,
         device='cpu'):
-    """ Train interaction model
+    """ Train protein-protein interaction model
 
     Parameters
     ----------
