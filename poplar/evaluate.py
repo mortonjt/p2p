@@ -70,16 +70,17 @@ def pairwise_auc(pretrained_model, binding_model,
     """
     with torch.no_grad():
         rank_counts = 0
-
         for j, (gene, pos, rnd, tax, protid) in enumerate(dataloader):
             gv, pv, nv = tokenize(gene, pos, rnd,
                                   pretrained_model, device)
             cv_score = binding_model.forward(gv, pv, nv)
             pred_pos = binding_model.predict(gv, pv)
             pred_neg = binding_model.predict(gv, nv)
-            rank_counts += torch.sum(pred_pos > pred_neg).item()
+            score = torch.sum(pred_pos > pred_neg).item()
+            rank_counts += score
 
-        total = max(1, len(dataloader))
+
+        total = max(1, j)
         tpr = rank_counts / total
         print(f'rank_counts {rank_counts}, tpr {tpr}, iteration {it}')
         writer.add_scalar(f'{name}/pairwise/TPR', tpr, it)
