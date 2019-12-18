@@ -67,6 +67,10 @@ def pairwise_auc(pretrained_model, binding_model,
     Returns
     -------
     float : average AUC
+
+    Note
+    ----
+    Question : what does len(dataloader) actually measure?
     """
     with torch.no_grad():
         rank_counts = 0

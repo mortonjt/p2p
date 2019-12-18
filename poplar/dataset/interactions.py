@@ -271,6 +271,9 @@ class ValidationDataset(InteractionDataset):
             ''.join(gene), ''.join(pos), ''.join(rnd), protid, taxa
         )
 
+    def __len__(self):
+        """ TODO"""
+        pass
 
     def __iter__(self):
         """ Retrieves an iterable of protein pairs
