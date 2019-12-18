@@ -236,6 +236,9 @@ class ValidationDataset(InteractionDataset):
         # sort values by protein 1 and taxonomy
         self.links = links.sort_values([0, 3])
 
+        # index to keep track
+        self.links['i'] = np.arange(len(self.links))
+
 
     def __getitem__(self, i):
         """ Retrieves protein pairs
@@ -294,8 +297,7 @@ class ValidationDataset(InteractionDataset):
         """
         for idx, group in self.links.groupby([3, 0]):
             tax, protid = idx
-            for i in group.index:
-                print(i, group.index, self.pairs.shape)
+            for i in group['i']:
                 gene = self.pairs[i, 0]
                 pos = self.pairs[i, 1]
                 for _ in range(self.num_neg):

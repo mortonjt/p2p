@@ -81,7 +81,7 @@ def pairwise_auc(pretrained_model, binding_model,
 
         total = max(1, len(dataloader))
         tpr = rank_counts / total
-        print(f'rank_counts {avg_rank}, tpr {tpr}, iteration {it}')
+        print(f'rank_counts {rank_counts}, tpr {tpr}, iteration {it}')
         writer.add_scalar(f'{name}/pairwise/TPR', tpr, it)
 
     return tpr

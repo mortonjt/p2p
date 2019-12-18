@@ -125,7 +125,6 @@ def simple_ppitrain(
                 last_now = now
                 now = time.time()
                 g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
-                print(g.shape, p.shape, n.shape)
                 loss = finetuned_model.forward(g, p, n)
 
                 if n_gpu > 1:
