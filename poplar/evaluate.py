@@ -68,9 +68,7 @@ def pairwise_auc(pretrained_model, binding_model,
     -------
     float : average AUC
 
-    Note
-    ----
-    Question : what does len(dataloader) actually measure?
+
     """
     with torch.no_grad():
         rank_counts = 0
@@ -83,9 +81,7 @@ def pairwise_auc(pretrained_model, binding_model,
             score = torch.sum(pred_pos > pred_neg).item()
             rank_counts += score
 
-
-        total = max(1, j)
-        tpr = rank_counts / total
+        tpr = rank_counts / j
         print(f'rank_counts {rank_counts}, tpr {tpr}, iteration {it}')
         writer.add_scalar(f'{name}/pairwise/TPR', tpr, it)
 

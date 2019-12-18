@@ -272,8 +272,11 @@ class ValidationDataset(InteractionDataset):
         )
 
     def __len__(self):
-        """ TODO"""
-        pass
+        """
+        TODO: This needs to be carefully tested.
+        The current output is not expected.
+        """
+        return len(self.links)
 
     def __iter__(self):
         """ Retrieves an iterable of protein pairs
