@@ -6,27 +6,32 @@ import math
 
 
 class PPIBinder(nn.Module):
-    def __init__(self, emb_size, emb_dimension):
+    def __init__(self, input_size, emb_dimension, peptide_model):
         """ Initialize model parameters.
 
         Parameters
         ----------
-        emb_size: int
-            Embedding size.
+        input_size: int
+            Input dimension size
         emb_dimention: int
             Embedding dimention, typically from 50 to 500.
+        peptide_model : torch.nn.Module
+            Language model for learning a representation of peptides.
 
-        TODO:
-          1. Rename this transformer file to something else (i.e. ppi).
-          2. Rename RobertaConstrastiveHead to PPBinder
+        Notes
+        -----
+        The language_model must be a subclass of torch.nn.Module
+        and must also have an `extract_features` method, which takes
+        in as input a peptide encoding an outputs a latent representation.
+
         """
         # See here: https://adoni.github.io/2017/11/08/word2vec-pytorch/
         super(PPIBinder, self).__init__()
-        self.emb_size = emb_size
+        self.input_size = input_size
         self.emb_dimension = emb_dimension
-        # TODO: swap u and v with linear layers
-        self.u_embeddings = nn.Linear(emb_size, emb_dimension)
-        self.v_embeddings = nn.Linear(emb_size, emb_dimension)
+        self.u_embeddings = nn.Linear(input_size, emb_dimension)
+        self.v_embeddings = nn.Linear(input_size, emb_dimension)
+        self.peptide_model = peptide_model
         self.init_emb()
 
     def init_emb(self):
@@ -34,7 +39,11 @@ class PPIBinder(nn.Module):
         self.u_embeddings.weight.data.normal_(0, initstd)
         self.v_embeddings.weight.data.normal_(0, initstd)
 
-    def forward(self, pos_u, pos_v, neg_v):
+    def forward(self, gene, pos, neg):
+        pos_u = self.peptide_model.extract_features(gene)[:, 0, :]
+        pos_v = self.peptide_model.extract_features(pos)[:, 0, :]
+        neg_v = self.peptide_model.extract_features(neg)[:, 0, :]
+
         # only take <s> token for pos_u, pos_v, and neg_v
         # this will obtain prot embedding
         losses = 0
@@ -57,7 +66,9 @@ class PPIBinder(nn.Module):
             losses += neg_score
         return -1 * losses
 
-    def predict(self, pos_u, pos_v):
+    def predict(self, x1, x2):
+        pos_u = self.peptide_model.extract_features(x1)[:, 0, :]
+        pos_v = self.peptide_model.extract_features(x2)[:, 0, :]
         emb_u = self.u_embeddings(pos_u)
         emb_v = self.v_embeddings(pos_v)
         score = torch.mul(emb_u, emb_v).squeeze()
