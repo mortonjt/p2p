@@ -11,12 +11,14 @@ from poplar.dataset.interactions import InteractionDataDirectory
 from poplar.dataset.interactions import ValidationDataset
 from poplar.util import encode, tokenize
 from poplar.evaluate import pairwise_auc
+from poplar.summary import (
+    summarize_gradients, checkpoint, initialize_logging)
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils import clip_grad_norm_
 from transformers import AdamW, WarmupLinearSchedule
 
 
-def train(pretrained_model, directory_dataloader,
+def train(ppi_model, directory_dataloader,
           positive_dataloaders, negative_dataloaders,
           logging_path=None, emb_dimension=100, max_steps=0,
           learning_rate=5e-5, warmup_steps=1000,
@@ -27,8 +29,8 @@ def train(pretrained_model, directory_dataloader,
 
     Parameters
     ----------
-    pretrained_model : fairseq.models.roberta.RobertaModel
-        Pretrained Roberta model.
+    ppi_model : fairseq.models.roberta.RobertaModel
+        Protein interaction prediction model
     directory_dataloader : InteractionDataDirectory
         Creates dataloaders.
     positive_dataloaders : list of dataloaders
@@ -63,72 +65,60 @@ def train(pretrained_model, directory_dataloader,
 
     TODO
     ----
-    1. Enable positive dataloaders.
-    2. Enable negative dataloaders.
+    1. Enable positive dataloaders. (done)
+    2. Enable negative dataloaders. (done)
     3. Update the run scripts.
     4. Preferably come up with a better name rather than simple_ppi
-       (i.e. binary contact, binary-binding)
+       (i.e. binary contact, binary-binding) (done)
     5. Include language model inside the prediction model?
-       May make it easier to modularize.
+       May make it easier to modularize. (done)
     6. Add tests for remaining evaluation functions.
-
-
+    7. Maybe within the model fold create subfolders
+       `peptide`, `fold` and `bind`, with abstract classes to
+       allow for plug and play architectures.
     """
-    last_summary_time = time.time()
-    last_checkpoint_time = time.time()
-    # the dimensionality of the roberta model
-    roberta_dim = int(list(list(pretrained_model.parameters())[-1].shape)[0])
-    finetuned_model = PPIBinder(roberta_dim, emb_dimension)
-    optimizer = AdamW(finetuned_model.parameters(), lr=learning_rate)
+    last_summary_time, last_checkpoint_time = time.time(), time.time()
 
+    # Estimate running time
     num_data = directory_dataloader.total()
     t_total = num_data // gradient_accumulation_steps
     max_steps = max(1, max_steps)
-    steps_per_epoch = max(t_total // num_data, 1)
-    epochs = max_steps // steps_per_epoch
+    epochs = max_steps // num_data
 
+    optimizer = AdamW(ppi_model.parameters(), lr=learning_rate)
     scheduler = WarmupLinearSchedule(
         optimizer, warmup_steps=warmup_steps, t_total=t_total)
 
-    finetuned_model.to(device)
-    n_gpu = torch.cuda.device_count()
-    if "CUDA_VISIBLE_DEVICES" in os.environ:
-        print(os.environ["CUDA_VISIBLE_DEVICES"], 'devices available')
-        print("Utilizing ", torch.cuda.device_count(), device)
-        if n_gpu > 1:
-            finetuned_model = torch.nn.DataParallel(finetuned_model)
-
     # Initialize logging path
-    writer = initialize_logging(logging_path=None)i
-    it = 0 # number of steps (iterations)
+    writer = initialize_logging(logging_path=None)
+    it = 0  # number of steps (iterations)
     print('Number of pairs', num_data)
     print('Number datasets', len(directory_dataloader))
     print('Number of epochs', epochs)
     for e in range(epochs):
         for k, dataloader in enumerate(directory_dataloader):
-            finetuned_model.train()
+            ppi_model.train()
             train_dataloader, test_dataloader, valid_dataloader = dataloader
             num_batches = len(train_dataloader)
             batch_size = train_dataloader.batch_size
 
             print(f'dataset {k}, num_batches {num_batches}')
             for j, (gene, pos, neg) in enumerate(train_dataloader):
-                g, p, n = tokenize(gene, pos, neg, pretrained_model, device)
-                loss = finetuned_model.forward(g, p, n)
+                loss = ppi_model.forward(gene, pos, neg)
 
                 if n_gpu > 1:
                     loss = loss.mean()
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
                 loss.backward()
-                clip_grad_norm_(finetuned_model.parameters(), clip_norm)
+                clip_grad_norm_(ppi_model.parameters(), clip_norm)
 
                 it += len(gene)
                 err = loss.item()
 
                 # write down summary stats
                 last_summary_time = summarize_gradients(
-                    finetuned_model, summary_interval,
+                    ppi_model, summary_interval,
                     last_summary_time, writer)
 
                 # clean up
@@ -146,10 +136,10 @@ def train(pretrained_model, directory_dataloader,
                 if j % gradient_accumulation_steps == 0:
                     optimizer.step()
                     scheduler.step()
-                    finetuned_model.zero_grad()
+                    ppi_model.zero_grad()
 
             # cross validation after each dataset is processed
-            tpr = pairwise_auc(pretrained_model, finetuned_model,
+            tpr = pairwise_auc(pretrained_model, ppi_model,
                                test_dataloader, 'Main/test', it, writer, device)
 
 
@@ -172,6 +162,7 @@ def train(pretrained_model, directory_dataloader,
 
     writer.close()
     return finetuned_model
+
 
 
 def ppi(fasta_file, training_directory, test_datasets,
@@ -237,12 +228,22 @@ def ppi(fasta_file, training_directory, test_datasets,
     pretrained_model = RobertaModel.from_pretrained(
         checkpoint_path, 'checkpoint_best.pt', data_dir)
     pretrained_model.to(device)
-
+    # the dimensionality of the roberta model
+    roberta_dim = int(list(list(pretrained_model.parameters())[-1].shape)[0])
     # freeze the weights of the pre-trained model
     for param in pretrained_model.parameters():
         param.requires_grad = False
 
+    ppi_model = PPIBinder(roberta_dim, emb_dimension, pretrained_model)
+    ppi_model.to(device)
+
     n_gpu = torch.cuda.device_count()
+    if "CUDA_VISIBLE_DEVICES" in os.environ:
+        print(os.environ["CUDA_VISIBLE_DEVICES"], 'devices available')
+        print("Utilizing ", torch.cuda.device_count(), device)
+        if n_gpu > 1:
+            ppi_model = torch.nn.DataParallel(ppi_model)
+
     batch_size = max(batch_size, batch_size * n_gpu)
     interaction_directory = InteractionDataDirectory(
         fasta_file, links_directory, training_column,
@@ -252,7 +253,7 @@ def ppi(fasta_file, training_directory, test_datasets,
 
     # train the fine_tuned model parameters
     finetuned_model = simple_ppitrain(
-        pretrained_model, interaction_directory,
+        ppi_model, interaction_directory,
         sampler, logging_path,
         emb_dimension, max_steps,
         learning_rate, warmup_steps, gradient_accumulation_steps,

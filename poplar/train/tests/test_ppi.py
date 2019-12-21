@@ -3,6 +3,7 @@ import unittest
 from poplar.train.ppi import ppi, train
 from poplar.util import get_data_path, dictionary
 from poplar.model.dummy import DummyModel
+from poplar.model.ppibinder import PPIBinder
 from poplar.dataset.interactions import NegativeSampler, InteractionDataDirectory
 
 import shutil
@@ -26,6 +27,7 @@ class TestTraining(unittest.TestCase):
         # Load dummy model
         input_dim = len(dictionary)
         hidden_size = 10
+        self.emb_dimension = 3
         self.pretrained_model = DummyModel(input_dim, hidden_size)
 
         # freeze the weights of the pre-trained model
@@ -39,9 +41,12 @@ class TestTraining(unittest.TestCase):
         self.pos_dataloader = [get_data_path('positives.txt')]
         self.neg_dataloader = [get_data_path('negatives.txt')]
 
+        # setup model.
+        self.ppi_model = PPIBinder(hidden_size, self.emb_dimension,
+                                   self.pretrained_model)
+
 
     def test_train(self):
-        emb_dimension = 3
         max_steps = 1000
         learning_rate = 1e-3
         warmup_steps = 10
@@ -54,11 +59,11 @@ class TestTraining(unittest.TestCase):
         device = 'cpu'
 
         finetuned_model = train(
-            self.pretrained_model, self.dataloader,
+            self.ppi_model, self.dataloader,
             positive_dataloaders=self.pos_dataloader,
             negative_dataloaders=self.neg_dataloader,
             logging_path=logging_path,
-            emb_dimension=emb_dimension,
+            emb_dimension=self.emb_dimension,
             max_steps=max_steps,
             learning_rate=learning_rate,
             warmup_steps=warmup_steps,

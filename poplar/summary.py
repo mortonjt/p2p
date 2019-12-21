@@ -1,6 +1,7 @@
 import torch
 import time
 import datetime
+from torch.utils.tensorboard import SummaryWriter
 
 
 def summarize_gradients(finetuned_model, summary_interval,

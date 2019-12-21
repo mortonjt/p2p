@@ -1,11 +1,19 @@
 import os
 import unittest
-from poplar.train.simple_ppi import simple_ppirun, simple_ppitrain
+from poplar.train.ppi import ppi, train
 from poplar.util import get_data_path, dictionary
 from poplar.model.dummy import DummyModel
 from poplar.dataset.interactions import NegativeSampler, InteractionDataDirectory
 import shutil
 
+
+class TestTrainingSmall(unittest.TestCase):
+    def setUp(self):
+        self.fasta_file = get_data_path('prots.fa')
+        self.links_file = os.path.abspath('data/links_files')
+        self.logging1 = 'logging1'
+        self.logging2 = 'logging2'
+        self.modelpath = 'model.pkt'
 
 
 class TestTrainingFull(unittest.TestCase):
