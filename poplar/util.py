@@ -7,20 +7,24 @@ import numbers
 
 def get_data_path(fn, subfolder='data'):
     """Return path to filename ``fn`` in the data folder.
+
     During testing it is often necessary to load data files. This
     function returns the full path to files in the ``data`` subfolder
     by default.
+
     Parameters
     ----------
     fn : str
         File name.
     subfolder : str, defaults to ``data``
         Name of the subfolder that contains the data.
+
     Returns
     -------
     str
         Inferred absolute path to the test data for the module where
         ``get_data_path(fn)`` is called.
+
     Notes
     -----
     The requested path may not point to an existing file, as its
@@ -38,7 +42,7 @@ def get_data_path(fn, subfolder='data'):
 
 
 def check_random_state(seed):
-    """Turn seed into a np.random.RandomState instance
+    """ Turn seed into a np.random.RandomState instance.
 
     Parameters
     ----------
@@ -60,7 +64,6 @@ def check_random_state(seed):
         return seed
     raise ValueError('%r cannot be used to seed a numpy.random.RandomState'
                      ' instance' % seed)
-
 
 
 dictionary = {
@@ -103,14 +106,18 @@ def encode(x):
 
 
 def tokenize(gene, pos, neg, model, device, pad=1024):
+    if len(gene) == len(pos) and len(gene) == len(neg):
+        # extract features, and take <CLS> token
+        g = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], gene))
+        p = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], pos))
+        n = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], neg))
 
-    # extract features, and take <CLS> token
-    g = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], gene))
-    p = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], pos))
-    n = list(map(lambda x: model.extract_features(encode(x))[:, 0, :], neg))
-
-    g_ = torch.cat(g, 0)
-    p_ = torch.cat(p, 0)
-    n_ = torch.cat(n, 0)
+        g_ = torch.cat(g, 0)
+        p_ = torch.cat(p, 0)
+        n_ = torch.cat(n, 0)
+    else:
+        g_ = model.extract_features(encode(gene))[:, 0, :]
+        p_ = model.extract_features(encode(pos))[:, 0, :]
+        n_ = model.extract_features(encode(neg))[:, 0, :]
 
     return g_, p_, n_

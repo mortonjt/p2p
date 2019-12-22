@@ -2,7 +2,7 @@ import torch
 import glob
 import math
 from torch.utils.data import Dataset, DataLoader, RandomSampler
-from poplar.util import dictionary, check_random_state
+from poplar.util import dictionary, check_random_state, encode
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
@@ -57,7 +57,6 @@ def parse(fasta_file, links_file, training_column=4,
     """
     seqs = list(SeqIO.parse(fasta_file, format='fasta'))
     links = pd.read_table(links_file, header=None, sep='\s+')
-
     train_links = links.loc[links[training_column] == 'Train']
     test_links = links.loc[links[training_column] == 'Test']
     valid_links = links.loc[links[training_column] == 'Validate']
@@ -73,21 +72,18 @@ def parse(fasta_file, links_file, training_column=4,
 
     sampler = NegativeSampler(seqs)
     train_dataloader, test_dataloader, valid_dataloader = None, None, None
+
     if len(train_pairs) > 0:
         train_dataset = InteractionDataset(train_pairs, sampler, num_neg=num_neg)
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
                                       shuffle=True, num_workers=num_workers,
-                                      drop_last=True, pin_memory=arm_the_gpu)
+                                      drop_last=False, pin_memory=arm_the_gpu)
     if len(test_pairs) > 0:
-        test_dataset = InteractionDataset(test_pairs, sampler, num_neg=num_neg)
-        test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
-                                      shuffle=True, num_workers=num_workers,
-                                      drop_last=True, pin_memory=arm_the_gpu)
+        test_dataloader = ValidationDataset(test_pairs, test_links,
+                                            sampler, num_neg=num_neg)
     if len(valid_pairs) > 0:
-        valid_dataset = InteractionDataset(valid_pairs, sampler, num_neg=num_neg)
-        valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size,
-                                      shuffle=True, num_workers=num_workers,
-                                      drop_last=True, pin_memory=arm_the_gpu)
+        valid_dataloader = ValidationDataset(valid_pairs, valid_links,
+                                             sampler, num_neg=num_neg)
 
     return train_dataloader, test_dataloader, valid_dataloader
 
@@ -106,7 +102,7 @@ class NegativeSampler(object):
 class InteractionDataDirectory(Dataset):
 
     def __init__(self, fasta_file, links_directory,
-                 training_column=2, num_neg=5,
+                 training_column=4, num_neg=5,
                  batch_size=10, num_workers=1, arm_the_gpu=False):
         print('links_directory', links_directory)
         self.fasta_file = fasta_file
@@ -115,6 +111,7 @@ class InteractionDataDirectory(Dataset):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.arm_the_gpu = arm_the_gpu
+        self.num_neg = num_neg
         self.index = 0
 
     def __len__(self):
@@ -123,7 +120,7 @@ class InteractionDataDirectory(Dataset):
     def total(self):
         fname = self.filenames[0]
         res = parse(self.fasta_file, fname, self.training_column,
-                    self.batch_size, num_neg, self.num_workers,
+                    self.batch_size, self.num_neg, self.num_workers,
                     self.arm_the_gpu)
         # number of sequences in a dataset = (num batch) x (batch size)
         t = len(res[0]) * res[0].batch_size
@@ -132,7 +129,7 @@ class InteractionDataDirectory(Dataset):
     def __iter__(self):
         return (
             parse(self.fasta_file, fname, self.training_column,
-                  self.batch_size, num_neg, self.num_workers,
+                  self.batch_size, self.num_neg, self.num_workers,
                   self.arm_the_gpu)
             for fname in self.filenames
         )
@@ -165,7 +162,6 @@ class InteractionDataset(Dataset):
         if sampler is None:
             self.num_neg = 1
 
-
     def random_peptide(self):
         if self.sampler is None:
             raise ("No negative sampler specified")
@@ -176,10 +172,29 @@ class InteractionDataset(Dataset):
         return self.pairs.shape[0]
 
     def __getitem__(self, i):
+        """
+        Parameters
+        ----------
+        i : int
+           Index of item
+
+        Returns
+        -------
+        gene : torch.Tensor
+           Encoded representation of protein of interest
+        pos : torch.Tensor
+           Encoded representation of protein that interacts with `gene`.
+        neg : torch.Tensor
+           Encoded representation of protein that probably doesn't
+           interact with `gene`.
+        """
         gene = self.pairs[i, 0]
         pos = self.pairs[i, 1]
         neg = self.random_peptide()
-        return ''.join(gene), ''.join(pos), ''.join(neg)
+        gene = ''.join(gene)
+        pos = ''.join(pos)
+        neg = ''.join(neg)
+        return gene, pos, neg
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -193,7 +208,6 @@ class InteractionDataset(Dataset):
         else:
             worker_id = worker_info.id
             w = float(worker_info.num_workers)
-
             t = (end - start)
             w = float(worker_info.num_workers)
             per_worker = int(math.ceil(t / w))
@@ -207,7 +221,6 @@ class InteractionDataset(Dataset):
 
 class ValidationDataset(InteractionDataset):
     """ Dataset for validation.
-
     Question: Do we even need this class???
 
     TODO:
@@ -239,6 +252,9 @@ class ValidationDataset(InteractionDataset):
         super().__init__(pairs, sampler, num_neg, seed)
         # sort values by protein 1 and taxonomy
         self.links = links.sort_values([0, 3])
+
+        # index to keep track
+        self.links['i'] = np.arange(len(self.links))
 
 
     def __getitem__(self, i):
@@ -272,6 +288,12 @@ class ValidationDataset(InteractionDataset):
             ''.join(gene), ''.join(pos), ''.join(rnd), protid, taxa
         )
 
+    def __len__(self):
+        """
+        TODO: This needs to be carefully tested.
+        The current output is not expected.
+        """
+        return len(self.links)
 
     def __iter__(self):
         """ Retrieves an iterable of protein pairs
@@ -298,7 +320,7 @@ class ValidationDataset(InteractionDataset):
         """
         for idx, group in self.links.groupby([3, 0]):
             tax, protid = idx
-            for i in group.index:
+            for i in group['i']:
                 gene = self.pairs[i, 0]
                 pos = self.pairs[i, 1]
                 for _ in range(self.num_neg):

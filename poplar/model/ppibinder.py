@@ -2,46 +2,37 @@ import torch
 import torch.nn as nn
 import torch.utils as utils
 import torch.nn.functional as F
+from poplar.util import encode as encode_f
 import math
 
 
-class RobertaClassificationHead(nn.Module):
-
-    def __init__(self, input_dim, inner_dim, num_classes,
-                 activation_fn, pooler_dropout):
-        super().__init__()
-        self.dense = nn.Linear(input_dim, inner_dim)
-        self.activation_fn = utils.get_activation_fn(activation_fn)
-        self.dropout = nn.Dropout(p=pooler_dropout)
-        self.out_proj = nn.Linear(inner_dim, num_classes)
-
-    def forward(self, features, **kwargs):
-        x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
-        x = self.dropout(x)
-        x = self.dense(x)
-        x = self.activation_fn(x)
-        x = self.dropout(x)
-        x = self.out_proj(x)
-        return x
-
-
-class RobertaConstrastiveHead(nn.Module):
-    def __init__(self, emb_size, emb_dimension):
+class PPIBinder(nn.Module):
+    def __init__(self, input_size, emb_dimension, peptide_model):
         """ Initialize model parameters.
 
         Parameters
         ----------
-        emb_size: Embedding size.
-        emb_dimention: Embedding dimention,
-             typically from 50 to 500.
+        input_size: int
+            Input dimension size
+        emb_dimention: int
+            Embedding dimention, typically from 50 to 500.
+        peptide_model : torch.nn.Module
+            Language model for learning a representation of peptides.
+
+        Notes
+        -----
+        The language_model must be a subclass of torch.nn.Module
+        and must also have an `extract_features` method, which takes
+        in as input a peptide encoding an outputs a latent representation.
+
         """
         # See here: https://adoni.github.io/2017/11/08/word2vec-pytorch/
-        super(RobertaConstrastiveHead, self).__init__()
-        self.emb_size = emb_size
+        super(PPIBinder, self).__init__()
+        self.input_size = input_size
         self.emb_dimension = emb_dimension
-        # TODO: swap u and v with linear layers
-        self.u_embeddings = nn.Linear(emb_size, emb_dimension)
-        self.v_embeddings = nn.Linear(emb_size, emb_dimension)
+        self.u_embeddings = nn.Linear(input_size, emb_dimension)
+        self.v_embeddings = nn.Linear(input_size, emb_dimension)
+        self.peptide_model = peptide_model
         self.init_emb()
 
     def init_emb(self):
@@ -49,7 +40,14 @@ class RobertaConstrastiveHead(nn.Module):
         self.u_embeddings.weight.data.normal_(0, initstd)
         self.v_embeddings.weight.data.normal_(0, initstd)
 
+    def encode(self, x):
+        f = lambda x: self.peptide_model.extract_features(encode_f(x))[:, 0, :]
+        y = list(map(f, x))
+        z = torch.cat(y, 0)
+        return z
+
     def forward(self, pos_u, pos_v, neg_v):
+
         # only take <s> token for pos_u, pos_v, and neg_v
         # this will obtain prot embedding
         losses = 0
@@ -72,9 +70,9 @@ class RobertaConstrastiveHead(nn.Module):
             losses += neg_score
         return -1 * losses
 
-    def predict(self, pos_u, pos_v):
-        emb_u = self.u_embeddings(pos_u)
-        emb_v = self.v_embeddings(pos_v)
+    def predict(self, x1, x2):
+        emb_u = self.u_embeddings(x1)
+        emb_v = self.v_embeddings(x2)
         score = torch.mul(emb_u, emb_v).squeeze()
         score = F.logsigmoid(torch.sum(score, -1))
         return score
