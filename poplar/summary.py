@@ -5,7 +5,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 def summarize_gradients(finetuned_model, summary_interval,
-                        last_summary_time, writer):
+                        last_summary_time, it, writer):
     """ Summarize the model gradients.
 
     finetuned_model : torch.nn.Module
@@ -14,6 +14,8 @@ def summarize_gradients(finetuned_model, summary_interval,
         The frequency that summaries get recorded in seconds.
     last_summary_time : int
         The time of the last summary.
+    it : int
+       Iteration number.
     writer : SummaryWrite
         Tensorboard summary writer.
 
@@ -27,9 +29,9 @@ def summarize_gradients(finetuned_model, summary_interval,
     now = time.time()
     if (now - last_summary_time) > summary_interval:
         # add gradients to histogram
-        writer.add_scalar('train_error', err, it)
         for name, param in finetuned_model.named_parameters():
-            writer.add_histogram('grad/%s' %  name, param.grad, it)
+            if param.grad is not None:
+                writer.add_histogram('grad/%s' %  name, param.grad, it)
     return now
 
 

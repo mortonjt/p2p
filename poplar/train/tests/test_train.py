@@ -21,6 +21,7 @@ class TestTrainingFull(unittest.TestCase):
     def setUp(self):
         self.fasta_file = get_data_path('prots.fa')
         self.links_file = os.path.abspath('data/links_files')
+        self.positives = [get_data_path('positives.txt')]
         self.logging1 = 'logging1'
         self.logging2 = 'logging2'
         self.modelpath = 'model.pkt'
@@ -31,8 +32,8 @@ class TestTrainingFull(unittest.TestCase):
         # self.data_dir = '/simons/scratch/jmorton/mgt/data/uniref50'
         # on rusty
         # TODO: Obtain a 1 layer attention head to train.
-        self.checkpoint = '/simons/scratch/jmorton/mgt/checkpoints/uniref50'
-        self.data_dir = '/simons/scratch/jmorton/mgt/data/uniref50'
+        self.checkpoint = '/mnt/home/mgt/roberta_checkpoints/uniref90/'
+        self.data_dir = '/mnt/home/mgt/data/uniref50/'
         self.checkpoint = '/mnt/home/jmorton/research/gert/data/full/uniref50/checkpoints'
         self.data_dir = '/mnt/home/jmorton/research/gert/data/full/uniref50/pretrain_data'
 
@@ -54,18 +55,18 @@ class TestTrainingFull(unittest.TestCase):
         # TODO: run on small dataset
         pass
 
-    @unittest.skip("Run only in the presence of model or data")
+    # @unittest.skip("Run only in the presence of model or data")
     def test_large_run(self):
         # # single gpu
         # question : why is accuracy not changing?
         # check -
         # 1. the variance of error estimate
         # 2. the gradients
-        acc1 = simple_ppirun(
+        acc1 = ppi(
             self.fasta_file, self.links_file,
             self.checkpoint, self.data_dir,
             self.modelpath, self.logging1,
-            training_column=2,
+            training_column=4,
             emb_dimension=10, num_neg=10,
             max_steps=1000, learning_rate=5e-3,
             warmup_steps=0,

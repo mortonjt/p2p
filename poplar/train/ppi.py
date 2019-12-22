@@ -9,6 +9,7 @@ from fairseq.models.roberta import RobertaModel
 from poplar.model.ppibinder import PPIBinder
 from poplar.dataset.interactions import InteractionDataDirectory
 from poplar.dataset.interactions import ValidationDataset
+from poplar.dataset.interactions import NegativeSampler
 from poplar.util import encode, tokenize
 from poplar.evaluate import pairwise_auc
 from poplar.summary import (
@@ -19,7 +20,6 @@ from transformers import AdamW, WarmupLinearSchedule
 
 
 def train(ppi_model, directory_dataloader,
-          positive_dataloaders, negative_dataloaders,
           logging_path=None, emb_dimension=100, max_steps=0,
           learning_rate=5e-5, warmup_steps=1000,
           gradient_accumulation_steps=1,
@@ -33,10 +33,10 @@ def train(ppi_model, directory_dataloader,
         Protein interaction prediction model
     directory_dataloader : InteractionDataDirectory
         Creates dataloaders.
-    positive_dataloaders : list of dataloaders
-        List of torch dataloaders for interactions
-    negative_dataloaders : list of dataloaders
-        List of torch dataloaders for interactions
+    *positive_dataloaders : list of dataloaders
+        List of torch dataloaders for interactions. TODO!
+    *negative_dataloaders : list of dataloaders
+        List of torch dataloaders for interactions. TODO!
     logging_path : path
         Path of logging file.
     emb_dimension : int
@@ -125,7 +125,7 @@ def train(ppi_model, directory_dataloader,
                 # write down summary stats
                 last_summary_time = summarize_gradients(
                     ppi_model, summary_interval,
-                    last_summary_time, writer)
+                    last_summary_time, it, writer)
 
                 # clean up
                 del loss, g, p, n
@@ -171,9 +171,9 @@ def train(ppi_model, directory_dataloader,
 
 
 
-def ppi(fasta_file, training_directory, test_datasets,
+def ppi(fasta_file, training_directory,
         checkpoint_path, data_dir, model_path, logging_path,
-        training_column='Training',
+        training_column=4,
         emb_dimension=100, num_neg=10,
         max_steps=10, learning_rate=5e-5,
         warmup_steps=1000, gradient_accumulation_steps=1,
@@ -189,15 +189,17 @@ def ppi(fasta_file, training_directory, test_datasets,
     training_directory : filepath
         Directory of links files. Each link file contains
         a table of tab delimited interactions
-    test_datasets : list of filepaths
-        List of datasets to use for testing.
+    positive_test_datasets : list of filepaths
+        List of datasets to use for testing positive interactions.
+    negative_test_datasets : list of filepaths
+        List of datasets to use for testing negative interactions.
     emb_dimensions : int
         Number of embedding dimensions.
     num_neg : int
         Number of negative samples.
     max_steps : int
         Maximum number of steps to run for. Each step corresponds to
-        the evaluation of a protein pair.
+z        the evaluation of a protein pair.
     learning_rate : float
         Learning rate of ADAM
     warmup_steps : int
@@ -252,19 +254,23 @@ def ppi(fasta_file, training_directory, test_datasets,
 
     batch_size = max(batch_size, batch_size * n_gpu)
     interaction_directory = InteractionDataDirectory(
-        fasta_file, links_directory, training_column,
-        batch_size, num_workers, device
+        fasta_file, training_directory, training_column,
+        batch_size, num_workers, 'cuda' in device
     )
     sampler = NegativeSampler(fasta_file)
 
+    # TODO: add in positive and negative dataloaders
+
     # train the fine_tuned model parameters
-    finetuned_model = simple_ppitrain(
-        ppi_model, interaction_directory,
-        sampler, logging_path,
-        emb_dimension, max_steps,
-        learning_rate, warmup_steps, gradient_accumulation_steps,
-        clip_norm, summary_interval, checkpoint_interval,
-        model_path, device)
+    finetuned_model = train(
+        ppi_model=ppi_model, directory_dataloader=interaction_directory,
+        logging_path=logging_path, emb_dimension=emb_dimension,
+        max_steps=max_steps, learning_rate=learning_rate,
+        warmup_steps=warmup_steps,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        clip_norm=clip_norm, summary_interval=summary_interval,
+        checkpoint_interval=checkpoint_interval,
+        model_path=model_path, device=device)
 
     # save the last model checkpoint
     suffix = 'last'

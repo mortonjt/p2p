@@ -57,7 +57,6 @@ def parse(fasta_file, links_file, training_column=4,
     """
     seqs = list(SeqIO.parse(fasta_file, format='fasta'))
     links = pd.read_table(links_file, header=None, sep='\s+')
-
     train_links = links.loc[links[training_column] == 'Train']
     test_links = links.loc[links[training_column] == 'Test']
     valid_links = links.loc[links[training_column] == 'Validate']
@@ -73,6 +72,7 @@ def parse(fasta_file, links_file, training_column=4,
 
     sampler = NegativeSampler(seqs)
     train_dataloader, test_dataloader, valid_dataloader = None, None, None
+
     if len(train_pairs) > 0:
         train_dataset = InteractionDataset(train_pairs, sampler, num_neg=num_neg)
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size,

@@ -59,8 +59,6 @@ class TestTraining(unittest.TestCase):
 
         finetuned_model = train(
             self.ppi_model, self.dataloader,
-            positive_dataloaders=self.pos_dataloader,
-            negative_dataloaders=self.neg_dataloader,
             logging_path=logging_path,
             emb_dimension=self.emb_dimension,
             max_steps=max_steps,
@@ -86,11 +84,11 @@ class TestTrainingFull(unittest.TestCase):
 
         # not ideal :(
         # on popeye
+        self.checkpoint = '/simons/scratch/jmorton/mgt/checkpoints/uniref90'
+        self.data_dir = '/simons/scratch/jmorton/mgt/data/uniref50'
+        # on rusty
         # self.checkpoint = '/simons/scratch/jmorton/mgt/checkpoints/uniref50'
         # self.data_dir = '/simons/scratch/jmorton/mgt/data/uniref50'
-        # on rusty
-        self.checkpoint = '/simons/scratch/jmorton/mgt/checkpoints/uniref50'
-        self.data_dir = '/simons/scratch/jmorton/mgt/data/uniref50'
         self.checkpoint = '/mnt/home/jmorton/research/gert/data/full/uniref50/checkpoints'
         self.data_dir = '/mnt/home/jmorton/research/gert/data/full/uniref50/pretrain_data'
 
@@ -110,7 +108,7 @@ class TestTrainingFull(unittest.TestCase):
             self.fasta_file, self.links_file,
             self.checkpoint, self.data_dir,
             self.modelpath, self.logging1,
-            training_column=2,
+            training_column=4,
             emb_dimension=10, num_neg=10,
             max_steps=1000, learning_rate=5e-3,
             warmup_steps=0,
