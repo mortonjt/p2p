@@ -2,7 +2,7 @@ import torch
 import glob
 import math
 from torch.utils.data import Dataset, DataLoader, RandomSampler
-from poplar.util import dictionary, check_random_state
+from poplar.util import dictionary, check_random_state, encode
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
@@ -162,7 +162,6 @@ class InteractionDataset(Dataset):
         if sampler is None:
             self.num_neg = 1
 
-
     def random_peptide(self):
         if self.sampler is None:
             raise ("No negative sampler specified")
@@ -173,10 +172,29 @@ class InteractionDataset(Dataset):
         return self.pairs.shape[0]
 
     def __getitem__(self, i):
+        """
+        Parameters
+        ----------
+        i : int
+           Index of item
+
+        Returns
+        -------
+        gene : torch.Tensor
+           Encoded representation of protein of interest
+        pos : torch.Tensor
+           Encoded representation of protein that interacts with `gene`.
+        neg : torch.Tensor
+           Encoded representation of protein that probably doesn't
+           interact with `gene`.
+        """
         gene = self.pairs[i, 0]
         pos = self.pairs[i, 1]
         neg = self.random_peptide()
-        return ''.join(gene), ''.join(pos), ''.join(neg)
+        gene = ''.join(gene)
+        pos = ''.join(pos)
+        neg = ''.join(neg)
+        return gene, pos, neg
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -190,7 +208,6 @@ class InteractionDataset(Dataset):
         else:
             worker_id = worker_info.id
             w = float(worker_info.num_workers)
-
             t = (end - start)
             w = float(worker_info.num_workers)
             per_worker = int(math.ceil(t / w))

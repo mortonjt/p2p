@@ -43,7 +43,7 @@ def roc_auc(model, dataloader, k=10):
     """
     pass
 
-def pairwise_auc(pretrained_model, binding_model,
+def pairwise_auc(binding_model,
                  dataloader, name, it, writer,
                  device='cpu'):
     """ Pairwise AUC comparison
@@ -68,15 +68,13 @@ def pairwise_auc(pretrained_model, binding_model,
     Returns
     -------
     float : average AUC
-
-
     """
     with torch.no_grad():
         rank_counts = 0
         for j, (gene, pos, rnd, tax, protid) in enumerate(dataloader):
-            gv, pv, nv = tokenize(gene, pos, rnd,
-                                  pretrained_model, device)
-            cv_score = binding_model.forward(gv, pv, nv)
+            gv = binding_model.encode([gene])
+            pv = binding_model.encode([pos])
+            nv = binding_model.encode([rnd])
             pred_pos = binding_model.predict(gv, pv)
             pred_neg = binding_model.predict(gv, nv)
             score = torch.sum(pred_pos > pred_neg).item()

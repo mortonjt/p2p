@@ -82,3 +82,4 @@ def initialize_logging(logging_path=None):
         suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
         logging_path = "_".join([basename, suffix])
     writer = SummaryWriter(logging_path)
+    return writer

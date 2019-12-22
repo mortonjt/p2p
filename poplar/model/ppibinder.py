@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.utils as utils
 import torch.nn.functional as F
+from poplar.util import encode as encode_f
 import math
 
 
@@ -39,10 +40,13 @@ class PPIBinder(nn.Module):
         self.u_embeddings.weight.data.normal_(0, initstd)
         self.v_embeddings.weight.data.normal_(0, initstd)
 
-    def forward(self, gene, pos, neg):
-        pos_u = self.peptide_model.extract_features(gene)[:, 0, :]
-        pos_v = self.peptide_model.extract_features(pos)[:, 0, :]
-        neg_v = self.peptide_model.extract_features(neg)[:, 0, :]
+    def encode(self, x):
+        f = lambda x: self.peptide_model.extract_features(encode_f(x))[:, 0, :]
+        y = list(map(f, x))
+        z = torch.cat(y, 0)
+        return z
+
+    def forward(self, pos_u, pos_v, neg_v):
 
         # only take <s> token for pos_u, pos_v, and neg_v
         # this will obtain prot embedding
@@ -67,10 +71,8 @@ class PPIBinder(nn.Module):
         return -1 * losses
 
     def predict(self, x1, x2):
-        pos_u = self.peptide_model.extract_features(x1)[:, 0, :]
-        pos_v = self.peptide_model.extract_features(x2)[:, 0, :]
-        emb_u = self.u_embeddings(pos_u)
-        emb_v = self.v_embeddings(pos_v)
+        emb_u = self.u_embeddings(x1)
+        emb_v = self.v_embeddings(x2)
         score = torch.mul(emb_u, emb_v).squeeze()
         score = F.logsigmoid(torch.sum(score, -1))
         return score

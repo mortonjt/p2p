@@ -45,7 +45,6 @@ class TestTraining(unittest.TestCase):
         self.ppi_model = PPIBinder(hidden_size, self.emb_dimension,
                                    self.pretrained_model)
 
-
     def test_train(self):
         max_steps = 1000
         learning_rate = 1e-3

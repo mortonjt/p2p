@@ -95,6 +95,8 @@ def train(ppi_model, directory_dataloader,
     print('Number of pairs', num_data)
     print('Number datasets', len(directory_dataloader))
     print('Number of epochs', epochs)
+    # converts sequences to peptide encodings
+    encode_f = lambda x: torch.stack(list(map(encode, x)))
     for e in range(epochs):
         for k, dataloader in enumerate(directory_dataloader):
             ppi_model.train()
@@ -104,9 +106,13 @@ def train(ppi_model, directory_dataloader,
 
             print(f'dataset {k}, num_batches {num_batches}')
             for j, (gene, pos, neg) in enumerate(train_dataloader):
-                loss = ppi_model.forward(gene, pos, neg)
+                # TODO: Need to work on encoding gene, pos and neg
+                g = ppi_model.encode(gene)
+                p = ppi_model.encode(pos)
+                n = ppi_model.encode(neg)
+                loss = ppi_model.forward(g, p, n)
 
-                if n_gpu > 1:
+                if torch.cuda.device_count() > 1:
                     loss = loss.mean()
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
@@ -128,7 +134,7 @@ def train(ppi_model, directory_dataloader,
 
                 # checkpoint
                 last_checkpoint_time = checkpoint(
-                    model, path, checkpoint_interval,
+                    ppi_model, logging_path, checkpoint_interval,
                     last_checkpoint_time, writer)
 
                 # accumulate gradients - so that we do backprop after loss
@@ -139,29 +145,29 @@ def train(ppi_model, directory_dataloader,
                     ppi_model.zero_grad()
 
             # cross validation after each dataset is processed
-            tpr = pairwise_auc(pretrained_model, ppi_model,
-                               test_dataloader, 'Main/test', it, writer, device)
+            tpr = pairwise_auc(ppi_model, test_dataloader,
+                               'Main/test', it, writer, device)
 
 
-    # save hparams
-    writer.add_hparams(
-        hparam_dict={
-            'emb_dimension': emb_dimension,
-            'learning_rate': learning_rate,
-            'warmup_steps': warmup_steps,
-            'gradient_accumulation_steps': gradient_accumulation_steps,
-            'batch_size': batch_size
-            },
-        metric_dict={
-            'train_error': err,
-            'test_error': cv_err,
-            'TPR': tpr,
-            'pos_score': pos_score
-        }
-    )
+    # save hparams (TODO: hparams isn't importing correctly)
+    # writer.add_hparams(
+    #     hparam_dict={
+    #         'emb_dimension': emb_dimension,
+    #         'learning_rate': learning_rate,
+    #         'warmup_steps': warmup_steps,
+    #         'gradient_accumulation_steps': gradient_accumulation_steps,
+    #         'batch_size': batch_size
+    #         },
+    #     metric_dict={
+    #         'train_error': err,
+    #         'test_error': cv_err,
+    #         'TPR': tpr,
+    #         'pos_score': pos_score
+    #     }
+    # )
 
     writer.close()
-    return finetuned_model
+    return ppi_model
 
 
 
