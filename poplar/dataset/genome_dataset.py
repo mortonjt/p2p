@@ -10,12 +10,11 @@ from poplar.dataset.data_util import draw_exclusive, get_context, get_seq, GeneI
 
 
 class GenomeDataset(Dataset):
-    def __init__(self, genbank_files, vocab, genbank_ext='.gb',
-                 num_neg = 10, num_gene_samples=100, skipgram_size=10000):
+    def __init__(self, genbank_files, num_neg = 10, num_gene_samples=100,
+                 window_size=10000):
         #glob.glob(genbank_directory, '*' + genbank_ext)
         self.genbank_files = genbank_files
-        self.vocab = vocab.mask
-        self.skipgram_size = skipgram_size
+        self.window_size = window_size
         self.num_neg = num_neg
         self.num_gene_samples = num_gene_samples
         self.idx = None
@@ -65,7 +64,6 @@ class GenomeDataset(Dataset):
                             print(self.genbank_files[i], 'could not be read.')
                             continue
 
-
     def random_gene(self, genes):
         """ Retrieve random gene and a pair
 
@@ -89,12 +87,12 @@ class GenomeDataset(Dataset):
         Question : Do we want to concatentate the <CLS> and terminal tokens?
                    For now, that answer is yes.
         """
-        idx = random.randint(len(genes))
+        idx = np.random.randint(len(genes))
         operon = get_context(genes, idx, window_size=self.window_size)
         gen = genes[idx]
-        jdx = random.randint(len(operon))
+        jdx = np.random.randint(len(operon))
         ctx = operon[jdx]
-        kdx = random.randint(len(genes))
+        kdx = np.random.randint(len(genes))
         rand = genes[kdx]
         return gen, ctx, rand
 

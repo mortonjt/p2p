@@ -4,6 +4,7 @@ import os
 import random
 import numpy as np
 from poplar.dataset.genome_dataset import GenomeDataset
+from poplar.dataset.data_util import distance
 from poplar.util import get_data_path
 
 
@@ -13,16 +14,21 @@ class TestGenomeDataset(unittest.TestCase):
         self.ecoli = get_data_path('ecoli.gb')
 
     def test_get_item(self):
-        pass
-
-    def test_get_item_cache(self):
-        pass
-
-    def test_iter(self):
-        pass
+        genes = GenomeDataset.read_genbank(self.ecoli)
+        dataset = GenomeDataset([self.ecoli])
+        res = dataset[0]
+        self.assertEqual(len(res), 3)
+        d = distance(res[0], res[1])
+        self.assertLess(d, 10000)
 
     def test_random_gene(self):
-        pass
+        np.random.seed(0)
+        genes = GenomeDataset.read_genbank(self.ecoli)
+        dataset = GenomeDataset([self.ecoli])
+        res = dataset.random_gene(genes)
+        self.assertEqual(len(res), 3)
+        d = distance(res[0], res[1])
+        self.assertLess(d, 10000)
 
     def test_read_genbank(self):
         genes = GenomeDataset.read_genbank(self.ecoli)
