@@ -7,7 +7,7 @@ import math
 
 
 class PPIBinder(nn.Module):
-    def __init__(self, input_size, emb_dimension, peptide_model):
+    def __init__(self, input_size, emb_dimension, peptide_model, device='cpu'):
         """ Initialize model parameters.
 
         Parameters
@@ -18,6 +18,8 @@ class PPIBinder(nn.Module):
             Embedding dimention, typically from 50 to 500.
         peptide_model : torch.nn.Module
             Language model for learning a representation of peptides.
+        cpu : str
+            Device name (default cpu)
 
         Notes
         -----
@@ -33,6 +35,7 @@ class PPIBinder(nn.Module):
         self.u_embeddings = nn.Linear(input_size, emb_dimension)
         self.v_embeddings = nn.Linear(input_size, emb_dimension)
         self.peptide_model = peptide_model
+        self.device = device
         self.init_emb()
 
     def init_emb(self):
@@ -41,7 +44,9 @@ class PPIBinder(nn.Module):
         self.v_embeddings.weight.data.normal_(0, initstd)
 
     def encode(self, x):
-        f = lambda x: self.peptide_model.extract_features(encode_f(x))[:, 0, :]
+        tokens = self.peptide_model.encode(' '.join(s))
+        tokens = tokens.to(self.device)
+        f = lambda x: self.peptide_model.extract_features(tokens)[:, 0, :]
         y = list(map(f, x))
         z = torch.cat(y, 0)
         return z
