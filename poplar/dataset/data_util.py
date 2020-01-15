@@ -22,17 +22,31 @@ def get_context(genes, idx, window_size):
         List of genes in genome
     idx : int
         Index for gene of interest
+
+    Note
+    ----
+    By the definition, genes are in the same operon if they can be
+    transcribed under the same transcription factor.
+
+    Since strands are transcribed separately, genes are different strands
+    cannot be on the same operon.
+
+    Another note, if two genes overlap, then they cannot be in the same operon
+    for the same reason -- they cannot be transcribed under the same
+    transcription factor.
     """
     lidx, ridx = idx - 1, idx + 1
     context = []
 
     # only grab gene if it is in the same strand
     while lidx >= 0 and ((genes[idx].start - genes[lidx].end) < window_size):
-        if genes[lidx].strand == genes[idx].strand:
+        if (genes[lidx].strand == genes[idx].strand and
+            not overlap(genes[ridx], genes[idx])):
             context.append(genes[lidx])
         lidx = lidx - 1
     while ridx < len(genes) and ((genes[ridx].start - genes[idx].end) < window_size):
-        if genes[ridx].strand == genes[idx].strand:
+        if (genes[ridx].strand == genes[idx].strand and
+            not overlap(genes[ridx], genes[idx])):
             context.append(genes[ridx])
         ridx = ridx + 1
     return context
@@ -82,16 +96,3 @@ def distance(x, y):
             abs(x.end - y.start),
             abs(y.end - x.start)
         )
-
-def mask(x, prob=0.5, mask_chr='_'):
-    y = copy(x)
-    r = np.random.random(len(y))
-    y[r<prob] = mask_chr
-    return y
-
-def mutate(x, prob, vocab):
-    y = copy(x)
-    r = np.random.random(len(y))
-    y[r<prob] = vocab.random(np.sum(r<prob))
-    return y
-
