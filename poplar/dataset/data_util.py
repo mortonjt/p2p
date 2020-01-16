@@ -41,7 +41,7 @@ def get_context(genes, idx, window_size):
     # only grab gene if it is in the same strand
     while lidx >= 0 and ((genes[idx].start - genes[lidx].end) < window_size):
         if (genes[lidx].strand == genes[idx].strand and
-            not overlap(genes[ridx], genes[idx])):
+            not overlap(genes[lidx], genes[idx])):
             context.append(genes[lidx])
         lidx = lidx - 1
     while ridx < len(genes) and ((genes[ridx].start - genes[idx].end) < window_size):

@@ -130,6 +130,8 @@ class GenomeDataset(Dataset):
 
         # sequences with start, end and position
         res = list(filter(lambda x: len(x) > 0, res))
+        # filter out empty sequences
+        res = list(filter(lambda x: len(x[2]) > 0, res))
         res = list(map(lambda x: GeneInterval(
             start=x[0], end=x[1], sequence=x[2], strand=x[3]
         ), res))

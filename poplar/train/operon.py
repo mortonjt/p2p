@@ -25,7 +25,8 @@ def ravel(x):
         return x
 
 def train(model, dataloader, optimizer, scheduler, writer,
-          logging_path, summary_interval, checkpoint_interval):
+          logging_path, gradient_accumulation_steps, clip_norm,
+          summary_interval, checkpoint_interval, it):
     """ Trains a single epoch.
 
     Parameters
@@ -42,10 +43,17 @@ def train(model, dataloader, optimizer, scheduler, writer,
         Writes intermediate results to tensorboard
     logging_path : str
         Path of logging file
+    gradient_accumulation_steps : int
+        Number of steps to accumulate gradients before
+        evaluating them.  This is for the sake of memory management.
+    clip_norm : float
+        Magnitude to clip gradients.
     summary_interval : int
         Number of seconds until a summary is written
     checkpoint_interval : int
         Number of seconds until a checkpoint is written
+    it : int
+        Iteration number
 
     Returns
     -------
@@ -55,12 +63,12 @@ def train(model, dataloader, optimizer, scheduler, writer,
 
     num_batches = len(dataloader)
     batch_size = dataloader.batch_size
-
+    it = 0
     for j, (gene, pos, neg) in enumerate(dataloader):
         model.train()
-        g = model.encode(ravel(gene))
-        p = model.encode(ravel(pos))
-        n = model.encode(ravel(neg))
+        g = model.encode(gene)
+        p = model.encode(pos)
+        n = model.encode(neg)
         loss = model.forward(g, p, n)
 
         if torch.cuda.device_count() > 1:
@@ -80,12 +88,12 @@ def train(model, dataloader, optimizer, scheduler, writer,
 
         # clean up
         del loss, g, p, n
-        if 'cuda' in device:
+        if 'cuda' in model.device:
             torch.cuda.empty_cache()
 
         # checkpoint
         last_checkpoint_time = checkpoint(
-            ppi_model, logging_path, checkpoint_interval,
+            model, logging_path, checkpoint_interval,
             last_checkpoint_time, writer)
 
         # accumulate gradients - so that we do backprop after loss
@@ -95,7 +103,7 @@ def train(model, dataloader, optimizer, scheduler, writer,
             scheduler.step()
             model.zero_grad()
 
-    return model
+    return model, it
 
 
 def fit(model, train_dataloader, test_dataloader,

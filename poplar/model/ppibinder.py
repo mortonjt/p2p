@@ -44,13 +44,14 @@ class PPIBinder(nn.Module):
         self.v_embeddings.weight.data.normal_(0, initstd)
 
     def encode(self, x : str) -> torch.Tensor:
-        tokens = ' '.join(list(x))
-        tokens = self.peptide_model.encode(tokens)
+        tokens = list(map(lambda z: ' '.join(list(z)), x))
+        tokens = list(map(self.peptide_model.encode, tokens))
+        tokens = list(map(torch.LongTensor, tokens))
+        f = lambda x: self.peptide_model.extract_features(x)[:, 0, :]
+        y = list(map(f, tokens))
+        tokens = torch.cat(y, 0)
         tokens = tokens.to(self.device)
-        f = lambda x: self.peptide_model.extract_features(tokens)[:, 0, :]
-        y = list(map(f, x))
-        z = torch.cat(y, 0)
-        return z
+        return tokens
 
     def forward(self, pos_u : torch.Tensor,
                 pos_v : torch.Tensor,
