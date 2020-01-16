@@ -18,6 +18,12 @@ from torch.nn.utils import clip_grad_norm_
 from transformers import AdamW, WarmupLinearSchedule
 
 
+def ravel(x):
+    if isinstance(x, tuple):
+        return x[0]
+    else:
+        return x
+
 def train(model, dataloader, optimizer, scheduler, writer,
           logging_path, summary_interval, checkpoint_interval):
     """ Trains a single epoch.
@@ -47,30 +53,14 @@ def train(model, dataloader, optimizer, scheduler, writer,
     """
     last_summary_time, last_checkpoint_time = time.time(), time.time()
 
-    # Estimate running time
-    num_data = len(dataloader)
-    t_total = num_data // gradient_accumulation_steps
-    max_steps = max(1, max_steps)
-    epochs = max_steps // num_data
-    optimizer = AdamW(ppi_model.parameters(), lr=learning_rate)
-    scheduler = WarmupLinearSchedule(
-        optimizer, warmup_steps=warmup_steps, t_total=t_total)
+    num_batches = len(dataloader)
+    batch_size = dataloader.batch_size
 
-    # Initialize logging path
-    writer = initialize_logging(logging_path=None)
-    it = 0  # number of steps (iterations)
-
-    # converts sequences to peptide encodings
-    train_dataloader, test_dataloader, valid_dataloader = dataloader
-    num_batches = len(train_dataloader)
-    batch_size = train_dataloader.batch_size
-
-    for j, (gene, pos, neg) in enumerate(train_dataloader):
+    for j, (gene, pos, neg) in enumerate(dataloader):
         model.train()
-
-        g = model.encode(gene)
-        p = model.encode(pos)
-        n = model.encode(neg)
+        g = model.encode(ravel(gene))
+        p = model.encode(ravel(pos))
+        n = model.encode(ravel(neg))
         loss = model.forward(g, p, n)
 
         if torch.cuda.device_count() > 1:
@@ -78,7 +68,7 @@ def train(model, dataloader, optimizer, scheduler, writer,
         if gradient_accumulation_steps > 1:
             loss = loss / gradient_accumulation_steps
         loss.backward()
-        clip_grad_norm_(ppi_model.parameters(), clip_norm)
+        clip_grad_norm_(model.parameters(), clip_norm)
 
         it += len(gene)
         err = loss.item()
@@ -112,6 +102,19 @@ def fit(model, train_dataloader, test_dataloader,
         optimizer, scheduler, epochs, writer,
         logging_path, summary_interval, checkpoint_interval):
     """ Performs a model fit over multiple epochs """
+
+    # Estimate running time
+    num_data = len(dataloader)
+    t_total = num_data // gradient_accumulation_steps
+    max_steps = max(1, max_steps)
+    epochs = max_steps // num_data
+    optimizer = AdamW(ppi_model.parameters(), lr=learning_rate)
+    scheduler = WarmupLinearSchedule(
+        optimizer, warmup_steps=warmup_steps, t_total=t_total)
+
+    # Initialize logging path
+    writer = initialize_logging(logging_path=None)
+    it = 0  # number of steps (iterations)
 
     for _ in range(epochs):
         model = train(model, train_dataloader, optimizer, scheduler, writer,

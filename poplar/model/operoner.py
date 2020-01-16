@@ -1,5 +1,6 @@
-from ppibinder import PPBinder
+from poplar.model.ppibinder import PPIBinder
 
 
 class Operoner(PPIBinder):
-        super(Operoner, self).__init__()
+    def __init__(self, *args, **kwds):
+        super(Operoner, self).__init__(*args, **kwds)

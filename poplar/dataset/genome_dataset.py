@@ -20,10 +20,26 @@ class GenomeDataset(Dataset):
         self.idx = None
         self._genes = None
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.genbank_files)
 
-    def __getitem__(self, item):
+    def sample(self, item : int) -> (str, str, str):
+        """ Sample triples from genbank file
+
+        Parameters
+        ----------
+        item : int
+            Index of genebank file
+
+        Returns
+        -------
+        gen : GeneInterval
+            Gene of interest
+        ctx : GeneInterval
+            Suggested context gene
+        rand : GeneInterval
+            Random gene
+        """
         # check cache and only reload genes if it is another item
         if item != self.idx:
             gb_file = self.genbank_files[item]
@@ -33,7 +49,11 @@ class GenomeDataset(Dataset):
             self.idx = item
 
         # get random gene and another context gene
-        return self.random_gene(self.genes)
+        res = self.random_gene(self.genes)
+        return res[0].sequence, res[1].sequence, res[2].sequence
+
+    def __getitem__(self, item) -> (str, str, str):
+        return self.sample(item)
 
     def __iter__(self):
         start = 0
@@ -44,7 +64,7 @@ class GenomeDataset(Dataset):
                 for _ in range(self.num_gene_samples):
                     for _ in range(self.num_neg):
                         try:
-                            yield self.__getitem__(i)
+                            yield self.sample(i)
                         except:
                             print(self.genbank_files[i], 'could not be read.')
                             continue
@@ -59,12 +79,13 @@ class GenomeDataset(Dataset):
                 for _ in range(self.num_gene_samples):
                     for _ in range(self.num_neg):
                         try:
-                            yield self.__getitem__(i)
+                            yield self.sample(i)
                         except:
                             print(self.genbank_files[i], 'could not be read.')
                             continue
 
-    def random_gene(self, genes):
+    def random_gene(self, genes : list) -> (
+            GeneInterval, GeneInterval, GeneInterval):
         """ Retrieve random gene and a pair
 
         Parameters
@@ -97,7 +118,7 @@ class GenomeDataset(Dataset):
         return gen, ctx, rand
 
     @staticmethod
-    def read_genbank(gb_file):
+    def read_genbank(gb_file : str) -> list:
         """ Read in genbank file and return a list of genes. """
         gb_record = SeqIO.read(open(gb_file, "r"), "genbank")
         cds = list(filter(lambda x: x.type == 'CDS', gb_record.features))

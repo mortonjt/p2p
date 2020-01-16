@@ -38,6 +38,7 @@ def preprocess(seqdict, links):
 def parse(fasta_file, links_file, training_column=4,
           batch_size=10, num_neg=10, num_workers=1, arm_the_gpu=False):
     """ Reads in data and creates dataloaders.
+
     Parameters
     ----------
     fasta_file : filepath

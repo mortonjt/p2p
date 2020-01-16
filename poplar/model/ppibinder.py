@@ -43,15 +43,18 @@ class PPIBinder(nn.Module):
         self.u_embeddings.weight.data.normal_(0, initstd)
         self.v_embeddings.weight.data.normal_(0, initstd)
 
-    def encode(self, x):
-        tokens = self.peptide_model.encode(' '.join(s))
+    def encode(self, x : str) -> torch.Tensor:
+        tokens = ' '.join(list(x))
+        tokens = self.peptide_model.encode(tokens)
         tokens = tokens.to(self.device)
         f = lambda x: self.peptide_model.extract_features(tokens)[:, 0, :]
         y = list(map(f, x))
         z = torch.cat(y, 0)
         return z
 
-    def forward(self, pos_u, pos_v, neg_v):
+    def forward(self, pos_u : torch.Tensor,
+                pos_v : torch.Tensor,
+                neg_v : torch.Tensor) -> torch.Tensor:
 
         # only take <s> token for pos_u, pos_v, and neg_v
         # this will obtain prot embedding
@@ -75,7 +78,7 @@ class PPIBinder(nn.Module):
             losses += neg_score
         return -1 * losses
 
-    def predict(self, x1, x2):
+    def predict(self, x1 : torch.Tensor, x2 : torch.Tensor) -> torch.Tensor:
         emb_u = self.u_embeddings(x1)
         emb_v = self.v_embeddings(x2)
         score = torch.mul(emb_u, emb_v).squeeze()
