@@ -18,12 +18,6 @@ from torch.nn.utils import clip_grad_norm_
 from transformers import AdamW, WarmupLinearSchedule
 
 
-def ravel(x):
-    if isinstance(x, tuple):
-        return x[0]
-    else:
-        return x
-
 def train(model, dataloader, optimizer, scheduler, writer,
           logging_path, gradient_accumulation_steps, clip_norm,
           summary_interval, checkpoint_interval, it):
@@ -107,16 +101,19 @@ def train(model, dataloader, optimizer, scheduler, writer,
 
 
 def fit(model, train_dataloader, test_dataloader,
-        optimizer, scheduler, epochs, writer,
-        logging_path, summary_interval, checkpoint_interval):
+        logging_path, max_steps, learning_rate,
+        warmup_steps, gradient_accumulation_steps, clip_norm,
+        summary_interval, checkpoint_interval):
     """ Performs a model fit over multiple epochs """
 
+    # get rough estimate of number of genes
+    num_genes = len(GenomeDataset.read_genbank(model.genbank_files[0]))
     # Estimate running time
-    num_data = len(dataloader)
+    num_data = len(train_dataloader) * num_genes
     t_total = num_data // gradient_accumulation_steps
     max_steps = max(1, max_steps)
     epochs = max_steps // num_data
-    optimizer = AdamW(ppi_model.parameters(), lr=learning_rate)
+    optimizer = AdamW(model.parameters(), lr=learning_rate)
     scheduler = WarmupLinearSchedule(
         optimizer, warmup_steps=warmup_steps, t_total=t_total)
 
@@ -125,17 +122,38 @@ def fit(model, train_dataloader, test_dataloader,
     it = 0  # number of steps (iterations)
 
     for _ in range(epochs):
-        model = train(model, train_dataloader, optimizer, scheduler, writer,
-                      logging_path, summary_interval, checkpoint_interval)
+
+        model, it = train(
+            operon_model, train_dataloader,
+            optimizer, scheduler, writer,
+            logging_path, gradient_accumulation_steps, clip_norm,
+            summary_interval, checkpoint_interval, it
+        )
 
         # cross validation after each epoch
         tpr = pairwise_auc(model, test_dataloader,
                            'Main/test', it, writer, device)
+
         print(f'tpr: {tpr}')
 
-    # we may want to have additional validation on an
+    # TODO: we may want to have additional validation on an
     # additional holdout dataset.
     return model
+
+
+def train_test_split(gbfiles):
+    # assume a 80/10/10 split
+    x = np.random.random(size=len(gbfiles))
+    def f(z):
+        if z < 0.8:
+            return 'Train'
+        elif z < 0.9:
+            return 'Test'
+        else:
+            return 'Validate'
+    splits = list(map(f, x))
+    df = pd.Series(splits, index=index_gb_files)
+    return df
 
 
 def operon(training_directory, genome_metadata,
@@ -157,6 +175,17 @@ def operon(training_directory, genome_metadata,
     genome_metadata: filepath
         Two column tab-delimited file specifying which genomes
         are heldout out for training, testing and validation.
+        If this is None, then a randomized split will be generated.
+    checkpoint_path : path
+        Path for roberta model.
+    data_dir : path
+        Path to data used for pretraining.
+    model_path : path
+        Path for finetuned model.
+    logging_path : path
+        Path for logging information.
+    gbk_ext : list of str
+        List of file extensions to recognize genbank files.
     emb_dimensions : int
         Number of embedding dimensions.
     num_neg : int
@@ -170,20 +199,12 @@ def operon(training_directory, genome_metadata,
         Number of warmup steps for scheduler
     gradient_accumulation_steps : int
         Number of steps before gradients are computed.
-    checkpoint_path : path
-        Path for roberta model.
-    data_dir : path
-        Path to data used for pretraining.
-    model_path : path
-        Path for finetuned model.
-    logging_path : path
-        Path for logging information.
-    gbk_ext : list of str
-        List of file extensions to recognize genbank files.
     clip_norm : float
         Clipping norm of gradients
     batch_size : int
         Number of protein triples to analyze in a given batch.
+    num_workers : int
+        Number of parallel workers to process data.
     summary_interval : int
         Number of seconds for a summary update.
     freeze_lm : bool
@@ -193,6 +214,28 @@ def operon(training_directory, genome_metadata,
         Name of device to run on.
 
     """
+
+    fnames = os.walk(training_directory)
+    gbk_ext = set(gbk_ext)
+    gbfiles = list(filter(lambda x: x[2].split('.')[-1] in gbk_ext, fnames))
+
+    if genome_metadeta is None:
+        genome_metadata = train_test_split(gbfiles)
+        genome_metadata.to_csv('genome_metadata.txt', sep='\t')
+
+    train_gb = genome_metadata=='Train'
+    train_dataset = GenomeDataset(list(train_gb.index))
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
+                            shuffle=True, num_workers=num_workers,
+                            drop_last=True, pin_memory='cuda' in device)
+
+    test_gb = genome_metadata=='Test'
+    test_dataset = GenomeDataset(list(test_gb.index))
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
+                                 shuffle=True, num_workers=num_workers,
+                                 drop_last=True, pin_memory='cuda' in device)
+
+
     # An example of how to load your own roberta model
     # roberta_checkpoint_path = 'checkpoints/uniref50'
     # data_dir = 'data/uniref50'
@@ -227,14 +270,15 @@ def operon(training_directory, genome_metadata,
 
     # train the fine_tuned model parameters
     finetuned_model = fit(
-        model=operon_model, directory_dataloader=interaction_directory,
-        logging_path=logging_path, emb_dimension=emb_dimension,
+        model=operon_model, train_dataloader=train_dataloader,
+        test_dataloader=test_dataloader,
+        logging_path=logging_path,
         max_steps=max_steps, learning_rate=learning_rate,
         warmup_steps=warmup_steps,
         gradient_accumulation_steps=gradient_accumulation_steps,
         clip_norm=clip_norm, summary_interval=summary_interval,
         checkpoint_interval=checkpoint_interval,
-        model_path=model_path, device=device)
+        device=device)
 
     # save the last model checkpoint
     suffix = 'last'
